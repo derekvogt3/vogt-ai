@@ -1,0 +1,20 @@
+{
+  "name": "@vogt-ai/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "build": "tsx --env-file=../../.env src/index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.7.4",
+    "@hono/node-server": "^1.13.8",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

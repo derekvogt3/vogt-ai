@@ -1,0 +1,11 @@
+{
+  "name": "vogt-ai",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
