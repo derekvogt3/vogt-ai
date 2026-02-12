@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown';
+
 type Props = {
   role: 'user' | 'assistant';
   content: string;
@@ -15,7 +17,13 @@ export function MessageBubble({ role, content }: Props) {
             : 'bg-gray-100 text-gray-900'
         }`}
       >
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
+        ) : (
+          <div className="prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-pre:my-2 prose-code:before:content-none prose-code:after:content-none prose-code:bg-gray-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-gray-800 prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-pre:rounded-lg">
+            <ReactMarkdown>{content}</ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );
