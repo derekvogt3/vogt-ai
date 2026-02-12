@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { useChat } from '../hooks/use-chat';
+import { useAuth } from '../hooks/use-auth';
 import { MessageBubble } from './MessageBubble';
 
 export function ChatArea() {
   const { messages, isStreaming, streamingContent, sendMessage, clearChat } =
     useChat();
+  const { user, logout } = useAuth();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -25,12 +27,21 @@ export function ChatArea() {
       {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
         <h1 className="text-lg font-semibold text-gray-900">vogt-ai</h1>
-        <button
-          onClick={clearChat}
-          className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-        >
-          New Chat
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{user?.email}</span>
+          <button
+            onClick={clearChat}
+            className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            New Chat
+          </button>
+          <button
+            onClick={logout}
+            className="rounded-lg px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            Logout
+          </button>
+        </div>
       </header>
 
       {/* Messages */}
