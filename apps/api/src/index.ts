@@ -1,16 +1,20 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { jwt } from 'hono/jwt';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { serve } from '@hono/node-server';
 import { HTTPException } from 'hono/http-exception';
 import { ZodError } from 'zod';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { env } from './env.js';
+import { db } from './db.js';
 import { chatRoutes } from './routes/chat-routes.js';
+import { authRoutes } from './routes/auth-routes.js';
 
 const app = new Hono();
 
-// CORS (for local dev where frontend runs on a different port)
-app.use('/api/*', cors({ origin: env.CORS_ORIGIN }));
+// CORS (credentials: true required for cookies in cross-origin dev)
+app.use('/api/*', cors({ origin: env.CORS_ORIGIN, credentials: true }));
 
 // Global error handler
 app.onError((err, c) => {
@@ -24,8 +28,29 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal server error' }, 500);
 });
 
-// API Routes
+// JWT middleware — protect ALL /api/* by default, skip only public whitelist
+const PUBLIC_PATHS = new Set([
+  '/api/health',
+  '/api/auth/register',
+  '/api/auth/login',
+  '/api/auth/logout',
+]);
+
+app.use('/api/*', async (c, next) => {
+  if (PUBLIC_PATHS.has(c.req.path)) {
+    return next();
+  }
+  const jwtMiddleware = jwt({
+    secret: env.JWT_SECRET,
+    alg: 'HS256',
+    cookie: 'auth_token',
+  });
+  return jwtMiddleware(c, next);
+});
+
+// Routes (all protected by default — only PUBLIC_PATHS above are exempt)
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
+app.route('/api/auth', authRoutes);
 app.route('/api/chat', chatRoutes);
 
 // Serve static frontend files (production: built React app copied to ./static)
@@ -34,6 +59,11 @@ app.use('*', serveStatic({ root: './static' }));
 // SPA fallback: serve index.html for any non-API, non-static route
 app.get('*', serveStatic({ root: './static', path: 'index.html' }));
 
+// Run migrations and start server
+await migrate(db, { migrationsFolder: './drizzle' });
+
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Server running on http://localhost:${info.port}`);
 });
+
+export { app };

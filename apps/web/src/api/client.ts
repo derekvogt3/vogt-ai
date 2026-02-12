@@ -18,6 +18,10 @@ export async function* streamChat(
   });
 
   if (!res.ok || !res.body) {
+    if (res.status === 401) {
+      window.location.href = '/login';
+      return;
+    }
     throw new Error(`Chat request failed: ${res.status}`);
   }
 
