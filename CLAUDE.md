@@ -2,11 +2,12 @@
 
 ## Project Overview
 
-vogt-ai is a full-stack TypeScript AI chat application that streams responses from Anthropic Claude. Built as a pnpm monorepo with a Hono API backend and React frontend, deployed as a single service on Railway.
+vogt-ai is a full-stack TypeScript AI chat application that streams responses from Anthropic Claude, with a static marketing site for Vogt AI consulting services. Built as a pnpm monorepo with a Hono API backend, React frontend, and Astro marketing site, deployed as a single service on Railway.
 
 ## Tech Stack
 
-- **Frontend**: React 19 + Vite 6 + Tailwind CSS 4 + React Router 7
+- **Marketing Site**: Astro 5 (static output) + Tailwind CSS 4
+- **Chat App**: React 19 + Vite 6 + Tailwind CSS 4 + React Router 7
 - **Backend**: Hono 4 on Node.js 22 (`@hono/node-server`)
 - **Database**: PostgreSQL + Drizzle ORM (`drizzle-orm` + `postgres` driver)
 - **Auth**: JWT in httpOnly cookies (`hono/jwt`) + bcryptjs for password hashing
@@ -21,7 +22,7 @@ vogt-ai is a full-stack TypeScript AI chat application that streams responses fr
 ```
 vogt-ai/
 ├── apps/
-│   ├── api/          # Hono backend — serves API + static frontend
+│   ├── api/          # Hono backend — serves API + both frontends
 │   │   ├── drizzle/              # SQL migration files (committed to git)
 │   │   ├── drizzle.config.ts     # Drizzle Kit config
 │   │   ├── vitest.config.ts      # Test config
@@ -35,9 +36,15 @@ vogt-ai/
 │   │           ├── auth-routes.test.ts # Auth route tests
 │   │           ├── chat-routes.ts      # POST /api/chat (SSE streaming)
 │   │           └── chat-routes.test.ts # Chat auth protection tests
-│   └── web/          # React frontend — built and served by the API
+│   ├── marketing/    # Astro static marketing site — served at /
+│   │   ├── astro.config.mjs
+│   │   └── src/
+│   │       ├── layouts/BaseLayout.astro  # SEO meta tags, JSON-LD, Open Graph
+│   │       ├── components/               # Header, Hero, Services, About, Contact, Footer
+│   │       └── pages/index.astro         # Single-page marketing site
+│   └── web/          # React chat app — served at /app
 │       └── src/
-│           ├── App.tsx                   # Router + AuthProvider wrapper
+│           ├── App.tsx                   # Router (basename="/app") + AuthProvider
 │           ├── main.tsx
 │           ├── api/
 │           │   ├── client.ts             # SSE stream parser (async generator)
@@ -47,7 +54,7 @@ vogt-ai/
 │           │   └── use-auth.ts           # AuthContext + useAuth hook
 │           └── components/
 │               ├── AuthProvider.tsx       # Auth context provider
-│               ├── ProtectedRoute.tsx     # Redirects to /login if unauthenticated
+│               ├── ProtectedRoute.tsx     # Redirects to /app/login if unauthenticated
 │               ├── LoginPage.tsx          # Login form
 │               ├── RegisterPage.tsx       # Register form
 │               ├── ChatArea.tsx           # Main chat UI
@@ -57,17 +64,25 @@ vogt-ai/
 └── tsconfig.base.json
 ```
 
+### URL routing
+
+| Path | Serves | Source |
+|---|---|---|
+| `/` | Marketing site (Astro static HTML) | `apps/marketing` |
+| `/app/*` | Chat app (React SPA) | `apps/web` |
+| `/api/*` | API routes (JWT-protected) | `apps/api` |
+
 ### Single-service deployment
 
-In production, the Hono API serves both `/api/*` routes AND the built React app as static files. There is no separate frontend service. The build script (`apps/api/package.json` → `build`) builds the React app and copies it to `apps/api/static/`.
+In production, the Hono API serves `/api/*` routes, the React chat app at `/app/*`, and the Astro marketing site at `/`. There is no separate frontend service. The build script (`apps/api/package.json` → `build`) builds both the Astro marketing site and the React app, copying them to `apps/api/static/marketing/` and `apps/api/static/app/` respectively.
 
 ### Authentication
 
 - **Protect-by-default**: All `/api/*` routes require JWT auth. Only routes in the `PUBLIC_PATHS` whitelist (health, register, login, logout) are exempt. New routes are automatically protected.
 - **JWT in httpOnly cookies**: Tokens are set as `httpOnly`, `secure` (production), `sameSite=Lax` cookies with 7-day expiry
 - **Password hashing**: bcryptjs with cost factor 12
-- **Frontend flow**: Unauthenticated users are redirected to `/login`. After login/register, redirected to `/` (chat). `AuthProvider` checks `/api/auth/me` on mount to restore sessions.
-- **401 handling**: The SSE client redirects to `/login` on 401 responses
+- **Frontend flow**: Unauthenticated users are redirected to `/app/login`. After login/register, redirected to `/app` (chat). `AuthProvider` checks `/api/auth/me` on mount to restore sessions.
+- **401 handling**: The SSE client redirects to `/app/login` on 401 responses
 
 ### Data flow
 
@@ -80,14 +95,16 @@ In production, the Hono API serves both `/api/*` routes AND the built React app 
 ## Development
 
 ```bash
-pnpm dev          # Runs both API (port 3000) and Vite (port 5173) in parallel
+pnpm dev          # Runs API (port 3000), Vite (port 5173), and Astro (port 4321) in parallel
 pnpm --filter @vogt-ai/api test       # Run backend tests
 pnpm --filter @vogt-ai/api test:watch # Run tests in watch mode
 ```
 
 - Vite dev server proxies `/api` to `localhost:3000` (configured in `vite.config.ts`)
 - API loads env vars from root `.env` via `--env-file=../../.env` flag
-- Frontend hot-reloads via Vite, API hot-reloads via `tsx watch`
+- React chat app hot-reloads via Vite at `localhost:5173/app/`
+- Astro marketing site hot-reloads at `localhost:4321`
+- API hot-reloads via `tsx watch`
 - Requires local PostgreSQL (Docker: `docker run -d --name vogt-ai-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=vogt_ai -p 5432:5432 postgres:16`)
 
 ### Database migrations
@@ -116,9 +133,9 @@ Production (Railway): set in Railway Variables tab. No `.env` file needed.
 ## Deployment (Railway)
 
 - **Platform**: Railway with Railpack builder (auto-detects pnpm monorepo)
-- **Build command**: `pnpm --filter @vogt-ai/api build` (builds React frontend + copies to static/)
+- **Build command**: `pnpm --filter @vogt-ai/api build` (builds Astro marketing site + React app, copies to static/)
 - **Start command**: `pnpm --filter @vogt-ai/api start` (runs `tsx src/index.ts`)
-- **Watch paths**: `/apps/api/**` and `/apps/web/**`
+- **Watch paths**: `/apps/api/**`, `/apps/web/**`, and `/apps/marketing/**`
 - **URL**: vogt-aiapi-production.up.railway.app
 - **GitHub repo**: github.com/derekvogt3/vogt-ai (auto-deploys on push to main)
 - **PostgreSQL**: Add Railway PostgreSQL plugin (auto-provisions `DATABASE_URL`)

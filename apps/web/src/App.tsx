@@ -7,7 +7,7 @@ import { RegisterPage } from './components/RegisterPage';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/app">
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

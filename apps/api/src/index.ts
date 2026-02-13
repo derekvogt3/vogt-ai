@@ -53,11 +53,20 @@ app.get('/api/health', (c) => c.json({ status: 'ok' }));
 app.route('/api/auth', authRoutes);
 app.route('/api/chat', chatRoutes);
 
-// Serve static frontend files (production: built React app copied to ./static)
-app.use('*', serveStatic({ root: './static' }));
+// React SPA at /app/*
+app.use(
+  '/app/*',
+  serveStatic({
+    root: './static/app',
+    rewriteRequestPath: (path) => path.replace(/^\/app/, ''),
+  })
+);
+app.get('/app/*', serveStatic({ root: './static/app', path: 'index.html' }));
+app.get('/app', serveStatic({ root: './static/app', path: 'index.html' }));
 
-// SPA fallback: serve index.html for any non-API, non-static route
-app.get('*', serveStatic({ root: './static', path: 'index.html' }));
+// Marketing site at / (catch-all, after API and /app routes)
+app.use('*', serveStatic({ root: './static/marketing' }));
+app.get('*', serveStatic({ root: './static/marketing', path: 'index.html' }));
 
 // Run migrations and start server
 await migrate(db, { migrationsFolder: './drizzle' });
