@@ -1,0 +1,56 @@
+---
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site ?? 'https://vogt-ai.com');
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL.href} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalURL.href} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "ProfessionalService",
+      "name": "Vogt AI",
+      "description": "AI consulting specializing in applied AI implementation and LLM integration",
+      "url": "https://vogt-ai.com",
+      "founder": {
+        "@type": "Person",
+        "name": "Derek Vogt",
+        "jobTitle": "Applied AI Engineer",
+        "knowsAbout": ["Artificial Intelligence", "Large Language Models", "TypeScript", "Python", "Full-Stack Development"]
+      },
+      "serviceType": ["AI Consulting", "LLM Integration", "Process Automation", "Custom AI Solutions"]
+    })} />
+
+    <title>{title}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased">
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  @import "../styles/global.css";
+</style>

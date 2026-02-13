@@ -1,0 +1,23 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Hero from '../components/Hero.astro';
+import Services from '../components/Services.astro';
+import About from '../components/About.astro';
+import Contact from '../components/Contact.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<BaseLayout
+  title="Vogt AI | Applied AI Consulting & Implementation"
+  description="AI consulting specializing in applied AI implementation, LLM integration, and custom AI solutions. We help companies turn AI potential into business results."
+>
+  <Header />
+  <main>
+    <Hero />
+    <Services />
+    <About />
+    <Contact />
+  </main>
+  <Footer />
+</BaseLayout>
