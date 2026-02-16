@@ -12,7 +12,6 @@ let insertResults: any[][] = [];
 
 vi.mock('../env.js', () => ({
   env: {
-    ANTHROPIC_API_KEY: 'test-key',
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     JWT_SECRET: TEST_JWT_SECRET,
     CORS_ORIGIN: 'http://localhost:5173',

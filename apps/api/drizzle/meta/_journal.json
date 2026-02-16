@@ -8,6 +8,13 @@
       "when": 1770860222565,
       "tag": "0000_nebulous_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771278261927,
+      "tag": "0001_overconfident_exodus",
+      "breakpoints": true
     }
   ]
 }

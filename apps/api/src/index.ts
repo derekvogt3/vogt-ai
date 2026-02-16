@@ -8,8 +8,9 @@ import { ZodError } from 'zod';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { env } from './env.js';
 import { db } from './db.js';
-import { chatRoutes } from './routes/chat-routes.js';
+
 import { authRoutes } from './routes/auth-routes.js';
+import { appRoutes } from './routes/app-routes.js';
 
 const app = new Hono();
 
@@ -51,7 +52,7 @@ app.use('/api/*', async (c, next) => {
 // Routes (all protected by default — only PUBLIC_PATHS above are exempt)
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
 app.route('/api/auth', authRoutes);
-app.route('/api/chat', chatRoutes);
+app.route('/api/apps', appRoutes);
 
 // React SPA at /app/*
 app.use(
