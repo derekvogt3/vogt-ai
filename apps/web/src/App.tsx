@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { AuthProvider } from './components/AuthProvider';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { ChatArea } from './components/ChatArea';
+import { AppListPage } from './components/AppListPage';
+import { AppDetailPage } from './components/AppDetailPage';
+import { TypeBuilderPage } from './components/TypeBuilderPage';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 
@@ -16,7 +18,23 @@ export default function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <ChatArea />
+                <AppListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/apps/:appId"
+            element={
+              <ProtectedRoute>
+                <AppDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/apps/:appId/types/:typeId/build"
+            element={
+              <ProtectedRoute>
+                <TypeBuilderPage />
               </ProtectedRoute>
             }
           />
