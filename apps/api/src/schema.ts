@@ -38,3 +38,12 @@ export const fields = pgTable('fields', {
   required: boolean('required').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const records = pgTable('records', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  typeId: uuid('type_id').notNull().references(() => types.id, { onDelete: 'cascade' }),
+  data: jsonb('data').notNull().default({}),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});

@@ -222,7 +222,7 @@ export function AppDetailPage() {
                 className="group flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md"
               >
                 <Link
-                  to={`/apps/${appId}/types/${type.id}/build`}
+                  to={`/apps/${appId}/types/${type.id}`}
                   className="flex-1"
                 >
                   <div className="flex items-center gap-3">

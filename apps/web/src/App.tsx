@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppListPage } from './components/AppListPage';
 import { AppDetailPage } from './components/AppDetailPage';
 import { TypeBuilderPage } from './components/TypeBuilderPage';
+import { RecordListPage } from './components/RecordListPage';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 
@@ -27,6 +28,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AppDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/apps/:appId/types/:typeId"
+            element={
+              <ProtectedRoute>
+                <RecordListPage />
               </ProtectedRoute>
             }
           />

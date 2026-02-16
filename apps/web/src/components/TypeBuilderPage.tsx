@@ -171,6 +171,19 @@ export function TypeBuilderPage() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-8">
+        {/* Data / Build tabs */}
+        <div className="mb-6 flex items-center gap-4 border-b border-gray-200">
+          <Link
+            to={`/apps/${appId}/types/${typeId}`}
+            className="border-b-2 border-transparent px-3 pb-2 text-sm font-medium text-gray-500 hover:text-gray-700"
+          >
+            Data
+          </Link>
+          <button className="border-b-2 border-blue-600 px-3 pb-2 text-sm font-medium text-blue-600">
+            Build
+          </button>
+        </div>
+
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Fields</h2>

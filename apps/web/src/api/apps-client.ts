@@ -150,3 +150,51 @@ export function reorderFields(appId: string, typeId: string, fieldIds: string[])
     body: JSON.stringify({ fieldIds }),
   });
 }
+
+// --- Records ---
+
+export type AppRecord = {
+  id: string;
+  typeId: string;
+  data: Record<string, unknown>;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RecordListResponse = {
+  records: AppRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export function createRecord(appId: string, typeId: string, data: Record<string, unknown>) {
+  return apiFetch<{ record: AppRecord }>(`/api/apps/${appId}/types/${typeId}/records`, {
+    method: 'POST',
+    body: JSON.stringify({ data }),
+  });
+}
+
+export function listRecords(appId: string, typeId: string, page = 1, pageSize = 50) {
+  return apiFetch<RecordListResponse>(
+    `/api/apps/${appId}/types/${typeId}/records?page=${page}&pageSize=${pageSize}`,
+  );
+}
+
+export function getRecord(appId: string, typeId: string, recordId: string) {
+  return apiFetch<{ record: AppRecord }>(`/api/apps/${appId}/types/${typeId}/records/${recordId}`);
+}
+
+export function updateRecord(appId: string, typeId: string, recordId: string, data: Record<string, unknown>) {
+  return apiFetch<{ record: AppRecord }>(`/api/apps/${appId}/types/${typeId}/records/${recordId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ data }),
+  });
+}
+
+export function deleteRecord(appId: string, typeId: string, recordId: string) {
+  return apiFetch<{ success: boolean }>(`/api/apps/${appId}/types/${typeId}/records/${recordId}`, {
+    method: 'DELETE',
+  });
+}
