@@ -12,6 +12,7 @@ import { db } from './db.js';
 import { authRoutes } from './routes/auth-routes.js';
 import { appRoutes } from './routes/app-routes.js';
 import { recordRoutes } from './routes/record-routes.js';
+import { aiRoutes } from './routes/ai-routes.js';
 
 const app = new Hono();
 
@@ -55,6 +56,7 @@ app.get('/api/health', (c) => c.json({ status: 'ok' }));
 app.route('/api/auth', authRoutes);
 app.route('/api/apps', appRoutes);
 app.route('/api/apps', recordRoutes);
+app.route('/api/apps', aiRoutes);
 
 // React SPA at /app/*
 app.use(
