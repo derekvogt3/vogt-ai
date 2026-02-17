@@ -1,12 +1,27 @@
-import { BrowserRouter, Routes, Route } from 'react-router';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router';
 import { AuthProvider } from './components/AuthProvider';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppListPage } from './components/AppListPage';
-import { AppDetailPage } from './components/AppDetailPage';
-import { TypeBuilderPage } from './components/TypeBuilderPage';
-import { RecordListPage } from './components/RecordListPage';
+import { AppWorkspace } from './components/AppWorkspace';
+import { TypeView } from './components/TypeView';
+import { RecordsTab } from './components/RecordsTab';
+import { FieldsTab } from './components/FieldsTab';
+import { ViewsTab } from './components/ViewsTab';
+import { PageBuilderPage } from './components/PageBuilderPage';
+import { PageViewPage } from './components/PageViewPage';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
+
+// Redirect old routes to new ones
+function RedirectToType() {
+  const { appId, typeId } = useParams<{ appId: string; typeId: string }>();
+  return <Navigate to={`/apps/${appId}/t/${typeId}`} replace />;
+}
+
+function RedirectToTypeFields() {
+  const { appId, typeId } = useParams<{ appId: string; typeId: string }>();
+  return <Navigate to={`/apps/${appId}/t/${typeId}/fields`} replace />;
+}
 
 export default function App() {
   return (
@@ -23,19 +38,50 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* App workspace with sidebar */}
           <Route
             path="/apps/:appId"
             element={
               <ProtectedRoute>
-                <AppDetailPage />
+                <AppWorkspace />
+              </ProtectedRoute>
+            }
+          >
+            {/* TypeView with tabs */}
+            <Route path="t/:typeId" element={<TypeView />}>
+              <Route index element={<RecordsTab />} />
+              <Route path="fields" element={<FieldsTab />} />
+              <Route path="views" element={<ViewsTab />} />
+            </Route>
+          </Route>
+
+          {/* Full-screen page builder (standalone) */}
+          <Route
+            path="/apps/:appId/pages/:pageId/edit"
+            element={
+              <ProtectedRoute>
+                <PageBuilderPage />
               </ProtectedRoute>
             }
           />
+
+          {/* Published page view */}
+          <Route
+            path="/apps/:appId/p/:pageSlug"
+            element={
+              <ProtectedRoute>
+                <PageViewPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Backwards compatibility redirects */}
           <Route
             path="/apps/:appId/types/:typeId"
             element={
               <ProtectedRoute>
-                <RecordListPage />
+                <RedirectToType />
               </ProtectedRoute>
             }
           />
@@ -43,7 +89,7 @@ export default function App() {
             path="/apps/:appId/types/:typeId/build"
             element={
               <ProtectedRoute>
-                <TypeBuilderPage />
+                <RedirectToTypeFields />
               </ProtectedRoute>
             }
           />

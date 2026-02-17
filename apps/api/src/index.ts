@@ -13,6 +13,7 @@ import { authRoutes } from './routes/auth-routes.js';
 import { appRoutes } from './routes/app-routes.js';
 import { recordRoutes } from './routes/record-routes.js';
 import { aiRoutes } from './routes/ai-routes.js';
+import { pageRoutes } from './routes/page-routes.js';
 
 const app = new Hono();
 
@@ -57,6 +58,7 @@ app.route('/api/auth', authRoutes);
 app.route('/api/apps', appRoutes);
 app.route('/api/apps', recordRoutes);
 app.route('/api/apps', aiRoutes);
+app.route('/api/apps', pageRoutes);
 
 // React SPA at /app/*
 app.use(

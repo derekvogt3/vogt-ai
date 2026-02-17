@@ -47,3 +47,26 @@ export const records = pgTable('records', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const pages = pgTable('pages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  appId: uuid('app_id').notNull().references(() => apps.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  slug: varchar('slug', { length: 255 }).notNull(),
+  description: text('description'),
+  config: jsonb('config').notNull().default({ root: { id: 'root', type: 'Container', props: { padding: 'md', maxWidth: '5xl' }, children: [] } }),
+  isHome: boolean('is_home').notNull().default(false),
+  published: boolean('published').notNull().default(false),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const pageVersions = pgTable('page_versions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  pageId: uuid('page_id').notNull().references(() => pages.id, { onDelete: 'cascade' }),
+  config: jsonb('config').notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
