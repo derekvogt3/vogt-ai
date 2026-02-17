@@ -8,6 +8,7 @@ import {
   createRecord,
   updateRecord,
   deleteRecord,
+  resolveRecords,
   type App,
   type AppType,
   type Field,
@@ -28,6 +29,9 @@ export function RecordListPage() {
   const [pageSize] = useState(50);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Resolved relation display values: { recordId → displayValue }
+  const [resolvedRelations, setResolvedRelations] = useState<Record<string, string>>({});
 
   // Add/edit record form
   const [showForm, setShowForm] = useState(false);
@@ -55,6 +59,46 @@ export function RecordListPage() {
       })
       .catch((err) => setError(err.message));
   }, [appId, typeId, page, pageSize]);
+
+  // Resolve relation display values
+  useEffect(() => {
+    if (!appId || fields.length === 0 || records.length === 0) return;
+
+    const relationFields = fields.filter((f) => f.type === 'relation');
+    if (relationFields.length === 0) return;
+
+    // Group relation IDs by their related type
+    const idsByType: Record<string, Set<string>> = {};
+    for (const field of relationFields) {
+      const relatedTypeId = (field.config as { relatedTypeId?: string })?.relatedTypeId;
+      if (!relatedTypeId) continue;
+      if (!idsByType[relatedTypeId]) idsByType[relatedTypeId] = new Set();
+      for (const rec of records) {
+        const val = (rec.data as Record<string, unknown>)[field.id];
+        if (typeof val === 'string' && val) {
+          idsByType[relatedTypeId].add(val);
+        }
+      }
+    }
+
+    // Resolve each related type's records
+    const entries = Object.entries(idsByType).filter(([, ids]) => ids.size > 0);
+    if (entries.length === 0) return;
+
+    Promise.all(
+      entries.map(([relatedTypeId, ids]) =>
+        resolveRecords(appId, relatedTypeId, [...ids])
+      )
+    ).then((results) => {
+      const merged: Record<string, string> = {};
+      for (const res of results) {
+        for (const [id, data] of Object.entries(res.records)) {
+          merged[id] = data.displayValue;
+        }
+      }
+      setResolvedRelations(merged);
+    }).catch(() => {});
+  }, [appId, fields, records]);
 
   const openAddForm = () => {
     setEditingRecordId(null);
@@ -205,6 +249,7 @@ export function RecordListPage() {
                     onChange={(val) =>
                       setFormData((prev) => ({ ...prev, [field.id]: val }))
                     }
+                    appId={appId}
                   />
                 </div>
               ))}
@@ -273,6 +318,7 @@ export function RecordListPage() {
                           <FieldRenderer
                             value={(record.data as Record<string, unknown>)[field.id]}
                             fieldType={field.type}
+                            resolvedRelations={resolvedRelations}
                           />
                         </td>
                       ))}

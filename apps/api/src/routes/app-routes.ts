@@ -7,7 +7,7 @@ import { getUserId, getAppForUser, getTypeForApp, getFieldForType } from './rout
 
 const fieldTypeEnum = z.enum([
   'text', 'rich_text', 'number', 'boolean', 'date',
-  'select', 'multi_select', 'url', 'email',
+  'select', 'multi_select', 'url', 'email', 'relation',
 ]);
 
 const createAppSchema = z.object({

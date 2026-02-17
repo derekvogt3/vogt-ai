@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, inArray } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { db } from '../db.js';
 import { fields, records } from '../schema.js';
@@ -71,6 +71,46 @@ recordRoutes.get('/:appId/types/:typeId/records', async (c) => {
     page,
     pageSize,
   });
+});
+
+// Batch resolve record IDs → display values
+recordRoutes.post('/:appId/types/:typeId/records/resolve', async (c) => {
+  const userId = getUserId(c);
+  const app = await getAppForUser(c.req.param('appId'), userId);
+  const type = await getTypeForApp(c.req.param('typeId'), app.id);
+
+  const body = await c.req.json();
+  const { ids } = z.object({ ids: z.array(z.string().uuid()) }).parse(body);
+
+  if (ids.length === 0) {
+    return c.json({ records: {} });
+  }
+
+  const matchedRecords = await db
+    .select()
+    .from(records)
+    .where(and(eq(records.typeId, type.id), inArray(records.id, ids)));
+
+  const typeFields = await db
+    .select()
+    .from(fields)
+    .where(eq(fields.typeId, type.id))
+    .orderBy(asc(fields.position));
+
+  const displayField = typeFields.find((f) =>
+    ['text', 'email', 'url'].includes(f.type)
+  );
+
+  const resolved: Record<string, { id: string; displayValue: string }> = {};
+  for (const rec of matchedRecords) {
+    const data = rec.data as Record<string, unknown>;
+    const displayValue = displayField
+      ? String(data[displayField.id] ?? rec.id)
+      : rec.id;
+    resolved[rec.id] = { id: rec.id, displayValue };
+  }
+
+  return c.json({ records: resolved });
 });
 
 // Get single record

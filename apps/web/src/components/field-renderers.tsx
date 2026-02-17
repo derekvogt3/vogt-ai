@@ -3,9 +3,10 @@ import type { FieldType } from '../api/apps-client';
 type FieldRendererProps = {
   value: unknown;
   fieldType: FieldType;
+  resolvedRelations?: Record<string, string>;
 };
 
-export function FieldRenderer({ value, fieldType }: FieldRendererProps) {
+export function FieldRenderer({ value, fieldType, resolvedRelations }: FieldRendererProps) {
   if (value === null || value === undefined || value === '') {
     return <span className="text-gray-300">—</span>;
   }
@@ -71,6 +72,17 @@ export function FieldRenderer({ value, fieldType }: FieldRendererProps) {
 
     case 'number':
       return <span className="text-sm text-gray-900">{String(value)}</span>;
+
+    case 'relation': {
+      const display = resolvedRelations?.[value as string];
+      return display ? (
+        <span className="inline-block rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+          {display}
+        </span>
+      ) : (
+        <span className="text-xs text-gray-400 italic">Deleted record</span>
+      );
+    }
 
     default:
       return <span className="text-sm text-gray-900">{String(value)}</span>;
