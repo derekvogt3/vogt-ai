@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { eq, and, asc, desc, sql } from 'drizzle-orm';
 import { db } from '../db.js';
-import { types, fields, records } from '../schema.js';
+import { types, fields, records, automations } from '../schema.js';
+import { emitRecordEvent } from '../events.js';
 
 // ============ TOOL DEFINITIONS ============
 
@@ -200,6 +201,68 @@ export const aiTools: Anthropic.Tool[] = [
         },
       },
       required: ['type_id'],
+    },
+  },
+  {
+    name: 'create_automation',
+    description: `Create a data automation that runs Python code in a secure sandbox when records are created, updated, or deleted, or when manually triggered.
+
+The Python code runs in an isolated environment with these globals:
+- ctx: dict with event info
+  - ctx["type"]: "record_created" | "record_updated" | "record_deleted" | "manual"
+  - ctx["record"]: dict of triggering record data (field_id → value)
+  - ctx["record_id"]: UUID string of the triggering record
+  - ctx["previous_record"]: dict of data before update (only for record_updated, else None)
+- field_map: dict mapping field IDs ↔ field names
+- pd: pandas is pre-imported
+- Helper functions:
+  - create_record(type_id, data): queue a new record (data is {field_id: value})
+  - update_record(type_id, record_id, data): queue a record update
+  - delete_record(type_id, record_id): queue a record deletion
+  - log(msg), warn(msg), error(msg): logging (visible in run history)
+
+Write plain Python script body. Reference field IDs (UUIDs), not names.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Human-readable name for the automation',
+        },
+        description: {
+          type: 'string',
+          description: 'What this automation does',
+        },
+        type_id: {
+          type: 'string',
+          description: 'UUID of the type this automation triggers on',
+        },
+        trigger: {
+          type: 'string',
+          enum: ['record_created', 'record_updated', 'record_deleted', 'manual'],
+          description: 'When this automation should trigger',
+        },
+        code: {
+          type: 'string',
+          description:
+            'Python code to execute. Has access to ctx, field_map, pd, create_record(), update_record(), delete_record(), log().',
+        },
+      },
+      required: ['name', 'type_id', 'trigger', 'code'],
+    },
+  },
+  {
+    name: 'list_automations',
+    description: 'List automations in the app, optionally filtered by type.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        type_id: {
+          type: 'string',
+          description: 'Optional UUID of a type to filter automations by',
+        },
+      },
+      required: [],
     },
   },
 ];
@@ -414,6 +477,15 @@ export async function executeTool(
           })
           .returning();
 
+        emitRecordEvent({
+          type: 'record_created',
+          appId: ctx.appId,
+          typeId: type.id,
+          recordId: record.id,
+          record: record.data as Record<string, unknown>,
+          userId: ctx.userId,
+        });
+
         return { success: true, result: record };
       }
 
@@ -458,6 +530,52 @@ export async function executeTool(
             pageSize,
           },
         };
+      }
+
+      case 'create_automation': {
+        // Verify type belongs to app
+        const [type] = await db
+          .select()
+          .from(types)
+          .where(
+            and(
+              eq(types.id, input.type_id as string),
+              eq(types.appId, ctx.appId),
+            ),
+          )
+          .limit(1);
+
+        if (!type) return { success: false, error: 'Type not found' };
+
+        const [automation] = await db
+          .insert(automations)
+          .values({
+            appId: ctx.appId,
+            typeId: input.type_id as string,
+            name: input.name as string,
+            description: (input.description as string) ?? null,
+            trigger: input.trigger as string,
+            code: input.code as string,
+            createdBy: ctx.userId,
+          })
+          .returning();
+
+        return { success: true, result: automation };
+      }
+
+      case 'list_automations': {
+        const conditions = [eq(automations.appId, ctx.appId)];
+        if (input.type_id) {
+          conditions.push(eq(automations.typeId, input.type_id as string));
+        }
+
+        const result = await db
+          .select()
+          .from(automations)
+          .where(and(...conditions))
+          .orderBy(desc(automations.createdAt));
+
+        return { success: true, result };
       }
 
       default:

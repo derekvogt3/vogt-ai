@@ -12,7 +12,6 @@ import {
   type AppType,
   type Page,
 } from '../api/apps-client';
-import { AIChatPanel } from './AIChatPanel';
 import { EmojiPicker } from './EmojiPicker';
 
 // --- Workspace context shared with child routes ---
@@ -23,6 +22,7 @@ type WorkspaceContextType = {
   pages: Page[];
   refreshTypes: () => void;
   refreshPages: () => void;
+  refreshKey: number;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextType | null>(null);
@@ -58,8 +58,8 @@ export function AppWorkspace() {
   const [editName, setEditName] = useState('');
   const [editIcon, setEditIcon] = useState('');
 
-  // AI chat
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  // Global refresh key — incremented when child workflows change data
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Derive active typeId from URL
   const typeIdMatch = location.pathname.match(/\/t\/([^/]+)/);
@@ -207,7 +207,7 @@ export function AppWorkspace() {
   }
 
   return (
-    <WorkspaceContext value={{ app, types, pages, refreshTypes, refreshPages }}>
+    <WorkspaceContext value={{ app, types, pages, refreshTypes, refreshPages, refreshKey }}>
       <div className="flex h-screen overflow-hidden bg-gray-50">
         {/* Sidebar */}
         <aside className="flex w-56 flex-shrink-0 flex-col border-r border-gray-200 bg-white">
@@ -343,15 +343,13 @@ export function AppWorkspace() {
 
           {/* Sidebar footer */}
           <div className="border-t border-gray-100 px-2 py-2">
-            <button
-              onClick={() => setIsChatOpen(true)}
+            <Link
+              to={`/apps/${appId}/schema-wizard`}
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-purple-600 hover:bg-purple-50"
             >
-              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 2a8 8 0 00-4.906 14.32l-.896 2.688a.5.5 0 00.632.632l2.688-.896A8 8 0 1010 2z" />
-              </svg>
-              AI Assistant
-            </button>
+              <span className="text-sm">✨</span>
+              Build with AI
+            </Link>
             <div className="mt-1 px-2 text-[10px] text-gray-400 truncate">
               {user?.email}
             </div>
@@ -373,14 +371,23 @@ export function AppWorkspace() {
                 <div className="mb-4 text-4xl">📋</div>
                 <h2 className="mb-2 text-lg font-semibold text-gray-900">No tables yet</h2>
                 <p className="mb-4 text-sm text-gray-500">
-                  Create your first table to start organizing data.
+                  Create your first table or let AI design your schema.
                 </p>
-                <button
-                  onClick={() => setShowAddTable(true)}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  Add Table
-                </button>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => setShowAddTable(true)}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Add Table
+                  </button>
+                  <Link
+                    to={`/apps/${appId}/schema-wizard`}
+                    className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                  >
+                    <span>✨</span>
+                    Build with AI
+                  </Link>
+                </div>
               </div>
             </div>
           ) : (
@@ -389,15 +396,6 @@ export function AppWorkspace() {
         </main>
       </div>
 
-      <AIChatPanel
-        appId={appId!}
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        onDataChanged={() => {
-          refreshTypes();
-          refreshPages();
-        }}
-      />
     </WorkspaceContext>
   );
 }

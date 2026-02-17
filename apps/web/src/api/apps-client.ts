@@ -276,3 +276,80 @@ export function restorePageVersion(appId: string, pageId: string, versionId: str
     method: 'POST',
   });
 }
+
+// --- Automations ---
+
+export type Automation = {
+  id: string;
+  appId: string;
+  typeId: string | null;
+  name: string;
+  description: string | null;
+  trigger: string;
+  triggerConfig: Record<string, unknown>;
+  code: string;
+  enabled: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AutomationRun = {
+  id: string;
+  automationId: string;
+  status: string;
+  triggerEvent: string;
+  triggerRecordId: string | null;
+  logs: Array<{ timestamp: string; level: string; message: string }>;
+  error: string | null;
+  durationMs: number | null;
+  createdAt: string;
+};
+
+export function listAutomations(appId: string, typeId?: string) {
+  const qs = typeId ? `?typeId=${typeId}` : '';
+  return apiFetch<{ automations: Automation[] }>(`/api/apps/${appId}/automations${qs}`);
+}
+
+export function createAutomation(
+  appId: string,
+  data: { name: string; typeId: string; trigger: string; code: string; description?: string; enabled?: boolean },
+) {
+  return apiFetch<{ automation: Automation }>(`/api/apps/${appId}/automations`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function getAutomation(appId: string, automationId: string) {
+  return apiFetch<{ automation: Automation }>(`/api/apps/${appId}/automations/${automationId}`);
+}
+
+export function updateAutomation(
+  appId: string,
+  automationId: string,
+  data: { name?: string; code?: string; enabled?: boolean; trigger?: string; description?: string },
+) {
+  return apiFetch<{ automation: Automation }>(`/api/apps/${appId}/automations/${automationId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteAutomation(appId: string, automationId: string) {
+  return apiFetch<{ success: boolean }>(`/api/apps/${appId}/automations/${automationId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function runAutomationManually(appId: string, automationId: string) {
+  return apiFetch<{ runId: string }>(`/api/apps/${appId}/automations/${automationId}/run`, {
+    method: 'POST',
+  });
+}
+
+export function listAutomationRuns(appId: string, automationId: string, page = 1, pageSize = 10) {
+  return apiFetch<{ runs: AutomationRun[]; total: number; page: number; pageSize: number }>(
+    `/api/apps/${appId}/automations/${automationId}/runs?page=${page}&pageSize=${pageSize}`,
+  );
+}

@@ -6,6 +6,7 @@ import { db } from '../db.js';
 import { fields, records } from '../schema.js';
 import { getUserId, getAppForUser, getTypeForApp } from './route-helpers.js';
 import { buildRecordSchema } from './record-validation.js';
+import { emitRecordEvent } from '../events.js';
 
 export const recordRoutes = new Hono();
 
@@ -38,6 +39,15 @@ recordRoutes.post('/:appId/types/:typeId/records', async (c) => {
     .insert(records)
     .values({ typeId: type.id, data, createdBy: userId })
     .returning();
+
+  emitRecordEvent({
+    type: 'record_created',
+    appId: app.id,
+    typeId: type.id,
+    recordId: record.id,
+    record: record.data as Record<string, unknown>,
+    userId,
+  });
 
   return c.json({ record }, 201);
 });
@@ -135,13 +145,24 @@ recordRoutes.put('/:appId/types/:typeId/records/:recordId', async (c) => {
   const body = await c.req.json();
   const updates = partialSchema.parse(body.data ?? {});
 
-  const mergedData = { ...(existing.data as Record<string, unknown>), ...updates };
+  const previousData = existing.data as Record<string, unknown>;
+  const mergedData = { ...previousData, ...updates };
 
   const [updated] = await db
     .update(records)
     .set({ data: mergedData, updatedAt: new Date() })
     .where(eq(records.id, existing.id))
     .returning();
+
+  emitRecordEvent({
+    type: 'record_updated',
+    appId: app.id,
+    typeId: type.id,
+    recordId: updated.id,
+    record: updated.data as Record<string, unknown>,
+    previousRecord: previousData,
+    userId,
+  });
 
   return c.json({ record: updated });
 });
@@ -154,5 +175,15 @@ recordRoutes.delete('/:appId/types/:typeId/records/:recordId', async (c) => {
   const record = await getRecordForType(c.req.param('recordId'), type.id);
 
   await db.delete(records).where(eq(records.id, record.id));
+
+  emitRecordEvent({
+    type: 'record_deleted',
+    appId: app.id,
+    typeId: type.id,
+    recordId: record.id,
+    record: record.data as Record<string, unknown>,
+    userId,
+  });
+
   return c.json({ success: true });
 });

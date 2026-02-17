@@ -60,7 +60,8 @@ export function TypeView() {
   const basePath = `/apps/${appId}/t/${typeId}`;
   const isFieldsTab = location.pathname.startsWith(`${basePath}/fields`);
   const isViewsTab = location.pathname.startsWith(`${basePath}/views`);
-  const isDataTab = !isFieldsTab && !isViewsTab;
+  const isAutomationsTab = location.pathname.startsWith(`${basePath}/automations`);
+  const isDataTab = !isFieldsTab && !isViewsTab && !isAutomationsTab;
 
   if (isLoading) {
     return (
@@ -127,6 +128,9 @@ export function TypeView() {
           </Link>
           <Link to={`${basePath}/views`} className={tabClass(isViewsTab)}>
             Views
+          </Link>
+          <Link to={`${basePath}/automations`} className={tabClass(isAutomationsTab)}>
+            Automations
           </Link>
         </div>
       </div>

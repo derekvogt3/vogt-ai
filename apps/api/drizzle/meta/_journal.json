@@ -29,6 +29,13 @@
       "when": 1771354406575,
       "tag": "0003_worthless_boomerang",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771362321001,
+      "tag": "0004_awesome_risque",
+      "breakpoints": true
     }
   ]
 }

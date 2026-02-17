@@ -2,12 +2,10 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
-import { eq, asc } from 'drizzle-orm';
 import { env } from '../env.js';
-import { db } from '../db.js';
-import { types, fields } from '../schema.js';
 import { getUserId, getAppForUser } from './route-helpers.js';
 import { aiTools, executeTool } from './ai-tools.js';
+import { buildSystemPrompt } from './ai-system-prompt.js';
 
 const chatSchema = z.object({
   messages: z.array(
@@ -17,84 +15,6 @@ const chatSchema = z.object({
     }),
   ),
 });
-
-// ============ SYSTEM PROMPT BUILDER ============
-
-async function buildSystemPrompt(appId: string): Promise<string> {
-  const appTypes = await db
-    .select()
-    .from(types)
-    .where(eq(types.appId, appId))
-    .orderBy(asc(types.position));
-
-  const typeFieldsMap: Record<string, (typeof fields.$inferSelect)[]> = {};
-  for (const type of appTypes) {
-    const typeFields = await db
-      .select()
-      .from(fields)
-      .where(eq(fields.typeId, type.id))
-      .orderBy(asc(fields.position));
-    typeFieldsMap[type.id] = typeFields;
-  }
-
-  let schemaDescription: string;
-  if (appTypes.length === 0) {
-    schemaDescription =
-      'This app currently has no types defined. It is a blank slate.';
-  } else {
-    schemaDescription = 'Current app schema:\n';
-    for (const type of appTypes) {
-      schemaDescription += `\nType: "${type.name}" (id: ${type.id})`;
-      if (type.description) schemaDescription += ` — ${type.description}`;
-      schemaDescription += '\n';
-
-      const tf = typeFieldsMap[type.id] || [];
-      if (tf.length === 0) {
-        schemaDescription += '  Fields: none\n';
-      } else {
-        for (const f of tf) {
-          schemaDescription += `  - "${f.name}" (id: ${f.id}, type: ${f.type}`;
-          if (f.required) schemaDescription += ', required';
-          if (f.type === 'relation') {
-            const relatedTypeId = (f.config as Record<string, unknown>)
-              ?.relatedTypeId as string | undefined;
-            const relatedType = appTypes.find((t) => t.id === relatedTypeId);
-            if (relatedType)
-              schemaDescription += `, relates to "${relatedType.name}"`;
-          }
-          if (f.type === 'select' || f.type === 'multi_select') {
-            const options = (f.config as Record<string, unknown>)?.options as
-              | string[]
-              | undefined;
-            if (options?.length)
-              schemaDescription += `, options: [${options.join(', ')}]`;
-          }
-          schemaDescription += ')\n';
-        }
-      }
-    }
-  }
-
-  return `You are an AI schema assistant that helps users design data models for their applications. You work within an app-building platform.
-
-${schemaDescription}
-
-Your capabilities:
-- Create, update, and delete types (data models like Contact, Company, Deal)
-- Create, update, and delete fields on types (text, number, boolean, date, select, multi_select, url, email, relation)
-- Create records (rows of data) in types
-- List records in a type
-
-Guidelines:
-- When the user asks you to create a data model (e.g. "build me a CRM"), create types and their fields systematically.
-- For relation fields, you MUST first create both types, then add the relation field referencing the target type's ID from the tool result.
-- Use appropriate field types: email fields for emails, url for URLs, select for status/category dropdowns, boolean for yes/no flags, date for dates, number for quantities/amounts.
-- Always give types and fields clear, descriptive names.
-- Set fields as required when they represent essential data (e.g., a Contact's name).
-- For select fields, provide sensible default options.
-- After making changes, briefly summarize what you created so the user knows what happened.
-- Be conversational but efficient. Execute tools to accomplish the user's request.`;
-}
 
 // ============ CHAT ROUTE ============
 

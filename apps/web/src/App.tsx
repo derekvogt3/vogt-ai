@@ -7,6 +7,8 @@ import { TypeView } from './components/TypeView';
 import { RecordsTab } from './components/RecordsTab';
 import { FieldsTab } from './components/FieldsTab';
 import { ViewsTab } from './components/ViewsTab';
+import { AutomationsTab } from './components/AutomationsTab';
+import { SchemaWizardPage } from './components/SchemaWizardPage';
 import { PageBuilderPage } from './components/PageBuilderPage';
 import { PageViewPage } from './components/PageViewPage';
 import { LoginPage } from './components/LoginPage';
@@ -53,7 +55,11 @@ export default function App() {
               <Route index element={<RecordsTab />} />
               <Route path="fields" element={<FieldsTab />} />
               <Route path="views" element={<ViewsTab />} />
+              <Route path="automations" element={<AutomationsTab />} />
             </Route>
+
+            {/* Schema wizard (AI-powered) */}
+            <Route path="schema-wizard" element={<SchemaWizardPage />} />
           </Route>
 
           {/* Full-screen page builder (standalone) */}

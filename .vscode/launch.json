@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug API (watch)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "watch", "--inspect", "src/index.ts"],
+      "cwd": "${workspaceFolder}/apps/api",
+      "envFile": "${workspaceFolder}/.env",
+      "restart": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true
+    },
+    {
+      "name": "Debug API (no watch)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "--inspect", "src/index.ts"],
+      "cwd": "${workspaceFolder}/apps/api",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true
+    }
+  ]
+}

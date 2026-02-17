@@ -14,6 +14,9 @@ import { appRoutes } from './routes/app-routes.js';
 import { recordRoutes } from './routes/record-routes.js';
 import { aiRoutes } from './routes/ai-routes.js';
 import { pageRoutes } from './routes/page-routes.js';
+import { automationRoutes } from './routes/automation-routes.js';
+import { aiGenerateRoutes } from './routes/ai-generate-routes.js';
+import { startAutomationDispatcher } from './automation-dispatcher.js';
 
 const app = new Hono();
 
@@ -59,6 +62,8 @@ app.route('/api/apps', appRoutes);
 app.route('/api/apps', recordRoutes);
 app.route('/api/apps', aiRoutes);
 app.route('/api/apps', pageRoutes);
+app.route('/api/apps', automationRoutes);
+app.route('/api/apps', aiGenerateRoutes);
 
 // React SPA at /app/*
 app.use(
@@ -77,6 +82,9 @@ app.get('*', serveStatic({ root: './static/marketing', path: 'index.html' }));
 
 // Run migrations and start server
 await migrate(db, { migrationsFolder: './drizzle' });
+
+// Start automation event dispatcher
+startAutomationDispatcher();
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Server running on http://localhost:${info.port}`);
