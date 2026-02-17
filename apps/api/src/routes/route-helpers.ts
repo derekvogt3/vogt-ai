@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { db } from '../db.js';
-import { apps, types, fields } from '../schema.js';
+import { apps, types, fields, pages } from '../schema.js';
 
 export async function getAppForUser(appId: string, userId: string) {
   const [app] = await db
@@ -31,6 +31,16 @@ export async function getFieldForType(fieldId: string, typeId: string) {
     .limit(1);
   if (!field) throw new HTTPException(404, { message: 'Field not found' });
   return field;
+}
+
+export async function getPageForApp(pageId: string, appId: string) {
+  const [page] = await db
+    .select()
+    .from(pages)
+    .where(and(eq(pages.id, pageId), eq(pages.appId, appId)))
+    .limit(1);
+  if (!page) throw new HTTPException(404, { message: 'Page not found' });
+  return page;
 }
 
 export function getUserId(c: any): string {

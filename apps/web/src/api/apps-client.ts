@@ -205,3 +205,74 @@ export function resolveRecords(appId: string, typeId: string, ids: string[]) {
     { method: 'POST', body: JSON.stringify({ ids }) },
   );
 }
+
+// --- Pages ---
+
+export type Page = {
+  id: string;
+  appId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  config: Record<string, unknown>;
+  isHome: boolean;
+  published: boolean;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PageVersion = {
+  id: string;
+  pageId: string;
+  config: Record<string, unknown>;
+  createdBy: string;
+  note: string | null;
+  createdAt: string;
+};
+
+export function createPage(appId: string, data: { name: string; slug: string; description?: string }) {
+  return apiFetch<{ page: Page }>(`/api/apps/${appId}/pages`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function listPages(appId: string) {
+  return apiFetch<{ pages: Page[] }>(`/api/apps/${appId}/pages`);
+}
+
+export function getPage(appId: string, pageId: string) {
+  return apiFetch<{ page: Page }>(`/api/apps/${appId}/pages/${pageId}`);
+}
+
+export function updatePage(
+  appId: string,
+  pageId: string,
+  data: { name?: string; slug?: string; description?: string; config?: Record<string, unknown>; published?: boolean; isHome?: boolean },
+) {
+  return apiFetch<{ page: Page }>(`/api/apps/${appId}/pages/${pageId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export function deletePage(appId: string, pageId: string) {
+  return apiFetch<{ success: boolean }>(`/api/apps/${appId}/pages/${pageId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function getPageBySlug(appId: string, slug: string) {
+  return apiFetch<{ page: Page }>(`/api/apps/${appId}/pages/by-slug/${slug}`);
+}
+
+export function listPageVersions(appId: string, pageId: string) {
+  return apiFetch<{ versions: PageVersion[] }>(`/api/apps/${appId}/pages/${pageId}/versions`);
+}
+
+export function restorePageVersion(appId: string, pageId: string, versionId: string) {
+  return apiFetch<{ page: Page }>(`/api/apps/${appId}/pages/${pageId}/versions/${versionId}/restore`, {
+    method: 'POST',
+  });
+}
