@@ -1,15 +1,67 @@
-import type { Field, FieldType } from '../api/apps-client';
+import { useState, useEffect } from 'react';
+import { listRecords, resolveRecords, type Field, type FieldType, type AppRecord } from '../api/apps-client';
 
 type FieldInputProps = {
   field: Field;
   value: unknown;
   onChange: (value: unknown) => void;
+  appId?: string;
 };
 
 const inputClass =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none';
 
-export function FieldInput({ field, value, onChange }: FieldInputProps) {
+function RelationInput({ field, value, onChange, appId }: FieldInputProps & { appId: string }) {
+  const [options, setOptions] = useState<{ id: string; label: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const relatedTypeId = (field.config as { relatedTypeId?: string })?.relatedTypeId;
+
+  useEffect(() => {
+    if (!relatedTypeId || !appId) {
+      setLoading(false);
+      return;
+    }
+    listRecords(appId, relatedTypeId, 1, 100)
+      .then(async (res) => {
+        if (res.records.length === 0) {
+          setOptions([]);
+          return;
+        }
+        const ids = res.records.map((r) => r.id);
+        const resolved = await resolveRecords(appId, relatedTypeId, ids);
+        setOptions(
+          res.records.map((r) => ({
+            id: r.id,
+            label: resolved.records[r.id]?.displayValue ?? r.id,
+          }))
+        );
+      })
+      .catch(() => setOptions([]))
+      .finally(() => setLoading(false));
+  }, [appId, relatedTypeId]);
+
+  if (loading) {
+    return <span className="text-xs text-gray-400">Loading...</span>;
+  }
+
+  return (
+    <select
+      value={(value as string) ?? ''}
+      onChange={(e) => onChange(e.target.value || null)}
+      className={inputClass}
+    >
+      <option value="">Select...</option>
+      {options.map((opt) => (
+        <option key={opt.id} value={opt.id}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export function FieldInput({ field, value, onChange, appId }: FieldInputProps) {
   switch (field.type) {
     case 'text':
     case 'rich_text':
@@ -132,6 +184,13 @@ export function FieldInput({ field, value, onChange }: FieldInputProps) {
           className={inputClass}
           placeholder="name@example.com"
         />
+      );
+
+    case 'relation':
+      return appId ? (
+        <RelationInput field={field} value={value} onChange={onChange} appId={appId} />
+      ) : (
+        <span className="text-xs text-gray-400">App context required</span>
       );
 
     default:

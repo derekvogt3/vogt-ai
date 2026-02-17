@@ -10,7 +10,9 @@ const TEST_APP_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const TEST_TYPE_ID = '11111111-2222-3333-4444-555555555555';
 const TEST_FIELD_ID_1 = 'f1111111-aaaa-bbbb-cccc-dddddddddddd';
 const TEST_FIELD_ID_2 = 'f2222222-aaaa-bbbb-cccc-dddddddddddd';
-const TEST_RECORD_ID = 'rrrrrrrr-aaaa-bbbb-cccc-dddddddddddd';
+const TEST_FIELD_ID_REL = 'f3333333-aaaa-bbbb-cccc-dddddddddddd';
+const TEST_RECORD_ID = 'a0a0a0a0-aaaa-bbbb-cccc-dddddddddddd';
+const TEST_RELATED_RECORD_ID = 'eeeeeeee-aaaa-bbbb-cccc-dddddddddddd';
 
 let selectResults: any[][] = [];
 let insertResults: any[][] = [];
@@ -245,7 +247,7 @@ describe('GET /api/apps/:appId/types/:typeId/records', () => {
     // records query
     const recordsList = [
       { id: TEST_RECORD_ID, typeId: TEST_TYPE_ID, data: { [TEST_FIELD_ID_1]: 'Alice' }, createdBy: TEST_USER_ID, createdAt: new Date(), updatedAt: new Date() },
-      { id: 'rrrrrrrr-2222-3333-4444-555555555555', typeId: TEST_TYPE_ID, data: { [TEST_FIELD_ID_1]: 'Bob' }, createdBy: TEST_USER_ID, createdAt: new Date(), updatedAt: new Date() },
+      { id: 'b0b0b0b0-2222-3333-4444-555555555555', typeId: TEST_TYPE_ID, data: { [TEST_FIELD_ID_1]: 'Bob' }, createdBy: TEST_USER_ID, createdAt: new Date(), updatedAt: new Date() },
     ];
     selectResults.push(recordsList);
 
@@ -387,5 +389,115 @@ describe('DELETE /api/apps/:appId/types/:typeId/records/:recordId', () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(deleteCount).toBe(1);
+  });
+});
+
+describe('Relation fields', () => {
+  beforeEach(() => {
+    selectResults = [];
+    insertResults = [];
+    updateResults = [];
+    deleteCount = 0;
+  });
+
+  const fieldsWithRelation = [
+    { id: TEST_FIELD_ID_1, typeId: TEST_TYPE_ID, name: 'Name', type: 'text', config: {}, position: 0, required: true, createdAt: new Date() },
+    { id: TEST_FIELD_ID_REL, typeId: TEST_TYPE_ID, name: 'Company', type: 'relation', config: { relatedTypeId: 'company-type-id' }, position: 1, required: false, createdAt: new Date() },
+  ];
+
+  it('creates a record with a valid relation UUID', async () => {
+    const app = createApp();
+    const token = await getAuthToken();
+
+    setupOwnershipChecks();
+    selectResults.push(fieldsWithRelation); // getFieldsForType
+
+    const recordData = { [TEST_FIELD_ID_1]: 'Alice', [TEST_FIELD_ID_REL]: TEST_RELATED_RECORD_ID };
+    const newRecord = {
+      id: TEST_RECORD_ID,
+      typeId: TEST_TYPE_ID,
+      data: recordData,
+      createdBy: TEST_USER_ID,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    insertResults.push([newRecord]);
+
+    const res = await app.request(
+      jsonRequest('POST', `/api/apps/${TEST_APP_ID}/types/${TEST_TYPE_ID}/records`, {
+        data: recordData,
+      }, `auth_token=${token}`)
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.record.data[TEST_FIELD_ID_REL]).toBe(TEST_RELATED_RECORD_ID);
+  });
+
+  it('returns 400 when relation value is not a UUID', async () => {
+    const app = createApp();
+    const token = await getAuthToken();
+
+    setupOwnershipChecks();
+    selectResults.push(fieldsWithRelation); // getFieldsForType
+
+    const res = await app.request(
+      jsonRequest('POST', `/api/apps/${TEST_APP_ID}/types/${TEST_TYPE_ID}/records`, {
+        data: { [TEST_FIELD_ID_1]: 'Alice', [TEST_FIELD_ID_REL]: 'not-a-uuid' },
+      }, `auth_token=${token}`)
+    );
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/apps/:appId/types/:typeId/records/resolve', () => {
+  beforeEach(() => {
+    selectResults = [];
+    insertResults = [];
+    updateResults = [];
+    deleteCount = 0;
+  });
+
+  it('resolves record IDs to display values', async () => {
+    const app = createApp();
+    const token = await getAuthToken();
+
+    setupOwnershipChecks();
+    // matched records
+    selectResults.push([
+      { id: TEST_RECORD_ID, typeId: TEST_TYPE_ID, data: { [TEST_FIELD_ID_1]: 'Acme Corp' }, createdBy: TEST_USER_ID, createdAt: new Date(), updatedAt: new Date() },
+    ]);
+    // type fields (for display field lookup)
+    selectResults.push([
+      { id: TEST_FIELD_ID_1, typeId: TEST_TYPE_ID, name: 'Name', type: 'text', config: {}, position: 0, required: true, createdAt: new Date() },
+    ]);
+
+    const res = await app.request(
+      jsonRequest('POST', `/api/apps/${TEST_APP_ID}/types/${TEST_TYPE_ID}/records/resolve`, {
+        ids: [TEST_RECORD_ID],
+      }, `auth_token=${token}`)
+    );
+
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.records[TEST_RECORD_ID].displayValue).toBe('Acme Corp');
+  });
+
+  it('returns empty object for empty ids array', async () => {
+    const app = createApp();
+    const token = await getAuthToken();
+
+    setupOwnershipChecks();
+
+    const res = await app.request(
+      jsonRequest('POST', `/api/apps/${TEST_APP_ID}/types/${TEST_TYPE_ID}/records/resolve`, {
+        ids: [],
+      }, `auth_token=${token}`)
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.records).toEqual({});
   });
 });

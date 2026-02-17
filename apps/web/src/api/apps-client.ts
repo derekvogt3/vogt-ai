@@ -23,7 +23,7 @@ export type AppType = {
 
 export type FieldType =
   | 'text' | 'rich_text' | 'number' | 'boolean' | 'date'
-  | 'select' | 'multi_select' | 'url' | 'email';
+  | 'select' | 'multi_select' | 'url' | 'email' | 'relation';
 
 export type Field = {
   id: string;
@@ -197,4 +197,11 @@ export function deleteRecord(appId: string, typeId: string, recordId: string) {
   return apiFetch<{ success: boolean }>(`/api/apps/${appId}/types/${typeId}/records/${recordId}`, {
     method: 'DELETE',
   });
+}
+
+export function resolveRecords(appId: string, typeId: string, ids: string[]) {
+  return apiFetch<{ records: Record<string, { id: string; displayValue: string }> }>(
+    `/api/apps/${appId}/types/${typeId}/records/resolve`,
+    { method: 'POST', body: JSON.stringify({ ids }) },
+  );
 }

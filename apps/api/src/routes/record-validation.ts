@@ -23,6 +23,8 @@ function zodForFieldType(type: string): z.ZodTypeAny {
       return z.string().url();
     case 'email':
       return z.string().email();
+    case 'relation':
+      return z.string().uuid();
     default:
       return z.unknown();
   }

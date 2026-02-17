@@ -24,6 +24,7 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'multi_select', label: 'Multi Select' },
   { value: 'url', label: 'URL' },
   { value: 'email', label: 'Email' },
+  { value: 'relation', label: 'Relation' },
 ];
 
 export function TypeBuilderPage() {
@@ -31,6 +32,7 @@ export function TypeBuilderPage() {
   const { user } = useAuth();
   const [app, setApp] = useState<App | null>(null);
   const [type, setType] = useState<AppType | null>(null);
+  const [appTypes, setAppTypes] = useState<AppType[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,6 +42,7 @@ export function TypeBuilderPage() {
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldType, setNewFieldType] = useState<FieldType>('text');
   const [newFieldRequired, setNewFieldRequired] = useState(false);
+  const [newFieldRelatedTypeId, setNewFieldRelatedTypeId] = useState('');
 
   // Editing field
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
@@ -50,6 +53,7 @@ export function TypeBuilderPage() {
     Promise.all([getApp(appId), getType(appId, typeId)])
       .then(([appRes, typeRes]) => {
         setApp(appRes.app);
+        setAppTypes(appRes.types);
         setType(typeRes.type);
         setFields(typeRes.fields);
       })
@@ -62,15 +66,21 @@ export function TypeBuilderPage() {
     if (!appId || !typeId) return;
     setError('');
     try {
+      const config: Record<string, unknown> = {};
+      if (newFieldType === 'relation' && newFieldRelatedTypeId) {
+        config.relatedTypeId = newFieldRelatedTypeId;
+      }
       const res = await createField(appId, typeId, {
         name: newFieldName,
         type: newFieldType,
         required: newFieldRequired,
+        config,
       });
       setFields((prev) => [...prev, res.field]);
       setNewFieldName('');
       setNewFieldType('text');
       setNewFieldRequired(false);
+      setNewFieldRelatedTypeId('');
       setShowAddField(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add field');
@@ -244,6 +254,27 @@ export function TypeBuilderPage() {
                   </select>
                 </div>
               </div>
+              {newFieldType === 'relation' && (
+                <div>
+                  <label htmlFor="field-related-type" className="mb-1 block text-sm font-medium text-gray-700">
+                    Related Type
+                  </label>
+                  <select
+                    id="field-related-type"
+                    value={newFieldRelatedTypeId}
+                    onChange={(e) => setNewFieldRelatedTypeId(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Select a type...</option>
+                    {appTypes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.icon || '📋'} {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   id="field-required"
@@ -329,6 +360,11 @@ export function TypeBuilderPage() {
                       <span className="inline-block rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
                         {FIELD_TYPES.find((ft) => ft.value === field.type)?.label || field.type}
                       </span>
+                      {field.type === 'relation' && (field.config as { relatedTypeId?: string })?.relatedTypeId && (
+                        <span className="ml-1 text-xs text-gray-400">
+                          → {appTypes.find((t) => t.id === (field.config as { relatedTypeId?: string }).relatedTypeId)?.name || '?'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <button

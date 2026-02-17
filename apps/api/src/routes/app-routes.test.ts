@@ -332,6 +332,42 @@ describe('POST /api/apps/:appId/types/:typeId/fields', () => {
     expect(body.field.required).toBe(true);
   });
 
+  it('creates a relation field with config', async () => {
+    const app = createApp();
+    const token = await getAuthToken();
+
+    // getAppForUser
+    selectResults.push([{ id: TEST_APP_ID, userId: TEST_USER_ID, name: 'My App' }]);
+    // getTypeForApp
+    selectResults.push([{ id: TEST_TYPE_ID, appId: TEST_APP_ID, name: 'Contact' }]);
+    // count existing fields
+    selectResults.push([]);
+    // insert field
+    insertResults.push([{
+      id: TEST_FIELD_ID,
+      typeId: TEST_TYPE_ID,
+      name: 'Company',
+      type: 'relation',
+      config: { relatedTypeId: '22222222-3333-4444-5555-666666666666' },
+      position: 0,
+      required: false,
+      createdAt: new Date(),
+    }]);
+
+    const res = await app.request(
+      jsonRequest('POST', `/api/apps/${TEST_APP_ID}/types/${TEST_TYPE_ID}/fields`, {
+        name: 'Company',
+        type: 'relation',
+        config: { relatedTypeId: '22222222-3333-4444-5555-666666666666' },
+      }, `auth_token=${token}`)
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.field.type).toBe('relation');
+    expect(body.field.config.relatedTypeId).toBe('22222222-3333-4444-5555-666666666666');
+  });
+
   it('returns 400 for invalid field type', async () => {
     const app = createApp();
     const token = await getAuthToken();
