@@ -39,7 +39,7 @@ export function PageViewPage() {
       <div className="flex h-screen flex-col items-center justify-center gap-4">
         <p className="text-gray-500">{error}</p>
         <Link to={`/apps/${appId}`} className="text-sm text-blue-600 hover:underline">
-          ← Back to app
+          ← Back to project
         </Link>
       </div>
     );

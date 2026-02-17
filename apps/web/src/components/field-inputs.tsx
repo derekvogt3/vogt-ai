@@ -190,7 +190,7 @@ export function FieldInput({ field, value, onChange, appId }: FieldInputProps) {
       return appId ? (
         <RelationInput field={field} value={value} onChange={onChange} appId={appId} />
       ) : (
-        <span className="text-xs text-gray-400">App context required</span>
+        <span className="text-xs text-gray-400">Project context required</span>
       );
 
     default:

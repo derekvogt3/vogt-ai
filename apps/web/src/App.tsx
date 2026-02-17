@@ -39,7 +39,7 @@ export default function App() {
             }
           />
 
-          {/* App workspace with sidebar */}
+          {/* Project workspace with sidebar */}
           <Route
             path="/apps/:appId"
             element={

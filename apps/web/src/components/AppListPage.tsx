@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../hooks/use-auth';
 import { listApps, createApp, deleteApp, type App } from '../api/apps-client';
+import { EmojiPicker } from './EmojiPicker';
 
 export function AppListPage() {
   const { user, logout } = useAuth();
@@ -11,6 +12,7 @@ export function AppListPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newIcon, setNewIcon] = useState('📦');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -27,14 +29,16 @@ export function AppListPage() {
       const res = await createApp({
         name: newName,
         description: newDescription || undefined,
+        icon: newIcon,
       });
       setApps((prev) => [...prev, res.app]);
       setNewName('');
       setNewDescription('');
+      setNewIcon('📦');
       setShowCreate(false);
       navigate(`/apps/${res.app.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create app');
+      setError(err instanceof Error ? err.message : 'Failed to create project');
     }
   };
 
@@ -43,7 +47,7 @@ export function AppListPage() {
       await deleteApp(appId);
       setApps((prev) => prev.filter((a) => a.id !== appId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete app');
+      setError(err instanceof Error ? err.message : 'Failed to delete project');
     }
   };
 
@@ -80,12 +84,12 @@ export function AppListPage() {
 
       <main className="mx-auto max-w-5xl px-6 py-8">
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Your Apps</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Your Projects</h2>
           <button
             onClick={() => setShowCreate(true)}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
-            Create App
+            Create Project
           </button>
         </div>
 
@@ -95,17 +99,23 @@ export function AppListPage() {
           </div>
         )}
 
-        {/* Create App Modal */}
+        {/* Create Project Modal */}
         {showCreate && (
           <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-lg font-medium text-gray-900">New App</h3>
+            <h3 className="mb-4 text-lg font-medium text-gray-900">New Project</h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label htmlFor="app-name" className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Icon
+                </label>
+                <EmojiPicker value={newIcon} onChange={setNewIcon} size="md" />
+              </div>
+              <div>
+                <label htmlFor="project-name" className="mb-1 block text-sm font-medium text-gray-700">
                   Name
                 </label>
                 <input
-                  id="app-name"
+                  id="project-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
@@ -116,15 +126,15 @@ export function AppListPage() {
                 />
               </div>
               <div>
-                <label htmlFor="app-desc" className="mb-1 block text-sm font-medium text-gray-700">
+                <label htmlFor="project-desc" className="mb-1 block text-sm font-medium text-gray-700">
                   Description (optional)
                 </label>
                 <input
-                  id="app-desc"
+                  id="project-desc"
                   type="text"
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="What is this app for?"
+                  placeholder="What is this project for?"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
                 />
               </div>
@@ -150,7 +160,7 @@ export function AppListPage() {
         {/* App Grid */}
         {apps.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <p className="text-gray-500">No apps yet. Create your first one to get started.</p>
+            <p className="text-gray-500">No projects yet. Create your first one to get started.</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

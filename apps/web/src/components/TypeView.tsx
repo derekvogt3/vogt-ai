@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useParams, useLocation, Link } from 'react-router';
 import { getType, updateType, type AppType } from '../api/apps-client';
 import { useWorkspace } from './AppWorkspace';
+import { EmojiPicker } from './EmojiPicker';
 
 export function TypeView() {
   const { appId, typeId } = useParams<{ appId: string; typeId: string }>();
@@ -15,6 +16,8 @@ export function TypeView() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
 
+  const [editIcon, setEditIcon] = useState('📋');
+
   useEffect(() => {
     if (!appId || !typeId) return;
     setIsLoading(true);
@@ -22,6 +25,7 @@ export function TypeView() {
       .then((res) => {
         setType(res.type);
         setEditName(res.type.name);
+        setEditIcon(res.type.icon || '📋');
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -37,6 +41,18 @@ export function TypeView() {
     } catch {
       setEditName(type?.name ?? '');
       setIsEditingName(false);
+    }
+  };
+
+  const handleIconChange = async (emoji: string) => {
+    setEditIcon(emoji);
+    if (!appId || !typeId) return;
+    try {
+      const res = await updateType(appId, typeId, { icon: emoji });
+      setType(res.type);
+      refreshTypes();
+    } catch {
+      setEditIcon(type?.icon || '📋');
     }
   };
 
@@ -73,7 +89,8 @@ export function TypeView() {
     <div className="flex h-full flex-col overflow-hidden">
       {/* Type header + tabs */}
       <div className="flex-shrink-0 border-b border-gray-200 bg-white px-6 pt-4">
-        <div className="mb-3">
+        <div className="mb-3 flex items-center gap-2">
+          <EmojiPicker value={editIcon} onChange={handleIconChange} size="md" />
           {isEditingName ? (
             <input
               type="text"
@@ -96,7 +113,7 @@ export function TypeView() {
               className="text-lg font-semibold text-gray-900 hover:text-blue-600"
               title="Click to rename"
             >
-              {type.icon || '📋'} {type.name}
+              {type.name}
             </button>
           )}
         </div>

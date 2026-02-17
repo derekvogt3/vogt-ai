@@ -13,6 +13,7 @@ import {
   type Page,
 } from '../api/apps-client';
 import { AIChatPanel } from './AIChatPanel';
+import { EmojiPicker } from './EmojiPicker';
 
 // --- Workspace context shared with child routes ---
 
@@ -50,10 +51,12 @@ export function AppWorkspace() {
   // Add table form
   const [showAddTable, setShowAddTable] = useState(false);
   const [newTableName, setNewTableName] = useState('');
+  const [newTableIcon, setNewTableIcon] = useState('📋');
 
-  // Edit app name
+  // Edit app name & icon
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editIcon, setEditIcon] = useState('');
 
   // AI chat
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -73,10 +76,11 @@ export function AppWorkspace() {
       setApp(appRes.app);
       setTypes(appRes.types);
       setEditName(appRes.app.name);
+      setEditIcon(appRes.app.icon || '📦');
       setPages(pagesRes.pages);
       return appRes.types;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load app');
+      setError(err instanceof Error ? err.message : 'Failed to load project');
       return [];
     }
   }, [appId]);
@@ -126,9 +130,10 @@ export function AppWorkspace() {
     if (!appId || !newTableName.trim()) return;
     setError('');
     try {
-      const res = await createType(appId, { name: newTableName.trim() });
+      const res = await createType(appId, { name: newTableName.trim(), icon: newTableIcon });
       setTypes((prev) => [...prev, res.type]);
       setNewTableName('');
+      setNewTableIcon('📋');
       setShowAddTable(false);
       navigate(`/apps/${appId}/t/${res.type.id}`);
     } catch (err) {
@@ -158,11 +163,25 @@ export function AppWorkspace() {
   const handleSaveName = async () => {
     if (!appId || !editName.trim()) return;
     try {
-      const res = await updateApp(appId, { name: editName.trim() });
+      const res = await updateApp(appId, { name: editName.trim(), icon: editIcon });
       setApp(res.app);
       setIsEditingName(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update app');
+      setError(err instanceof Error ? err.message : 'Failed to update project');
+    }
+  };
+
+  const handleIconChange = async (emoji: string) => {
+    setEditIcon(emoji);
+    if (!appId) return;
+    // Save icon immediately
+    try {
+      const res = await updateApp(appId, { icon: emoji });
+      setApp(res.app);
+      refreshTypes(); // refresh sidebar
+    } catch {
+      // revert on failure
+      setEditIcon(app?.icon || '📦');
     }
   };
 
@@ -182,7 +201,7 @@ export function AppWorkspace() {
   if (!app) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-gray-500">App not found</p>
+        <p className="text-gray-500">Project not found</p>
       </div>
     );
   }
@@ -196,7 +215,7 @@ export function AppWorkspace() {
           <div className="border-b border-gray-100 px-4 py-3">
             <div className="flex items-center justify-between">
               <Link to="/" className="text-xs text-gray-400 hover:text-gray-600">
-                ← Apps
+                ← Projects
               </Link>
               <button
                 onClick={handleLogout}
@@ -205,7 +224,8 @@ export function AppWorkspace() {
                 Logout
               </button>
             </div>
-            <div className="mt-2">
+            <div className="mt-2 flex items-center gap-1.5">
+              <EmojiPicker value={editIcon || '📦'} onChange={handleIconChange} size="sm" />
               {isEditingName ? (
                 <input
                   type="text"
@@ -228,7 +248,7 @@ export function AppWorkspace() {
                   className="text-sm font-semibold text-gray-900 hover:text-blue-600"
                   title="Click to rename"
                 >
-                  {app.icon || '📦'} {app.name}
+                  {app.name}
                 </button>
               )}
             </div>
@@ -282,26 +302,31 @@ export function AppWorkspace() {
             {/* Add table */}
             {showAddTable ? (
               <form onSubmit={handleAddTable} className="mt-1 px-1">
-                <input
-                  type="text"
-                  value={newTableName}
-                  onChange={(e) => setNewTableName(e.target.value)}
-                  placeholder="Table name..."
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setShowAddTable(false);
-                      setNewTableName('');
-                    }
-                  }}
-                  onBlur={() => {
-                    if (!newTableName.trim()) {
-                      setShowAddTable(false);
-                      setNewTableName('');
-                    }
-                  }}
-                  className="w-full rounded border border-blue-300 px-2 py-1 text-sm focus:outline-none"
-                />
+                <div className="flex items-center gap-1.5">
+                  <EmojiPicker value={newTableIcon} onChange={setNewTableIcon} size="sm" />
+                  <input
+                    type="text"
+                    value={newTableName}
+                    onChange={(e) => setNewTableName(e.target.value)}
+                    placeholder="Table name..."
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setShowAddTable(false);
+                        setNewTableName('');
+                        setNewTableIcon('📋');
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!newTableName.trim()) {
+                        setShowAddTable(false);
+                        setNewTableName('');
+                        setNewTableIcon('📋');
+                      }
+                    }}
+                    className="w-full rounded border border-blue-300 px-2 py-1 text-sm focus:outline-none"
+                  />
+                </div>
               </form>
             ) : (
               <button
