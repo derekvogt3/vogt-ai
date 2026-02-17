@@ -9,6 +9,7 @@ import {
   type App,
   type AppType,
 } from '../api/apps-client';
+import { AIChatPanel } from './AIChatPanel';
 
 export function AppDetailPage() {
   const { appId } = useParams<{ appId: string }>();
@@ -27,6 +28,9 @@ export function AppDetailPage() {
   // Inline app name editing
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
+
+  // AI chat panel
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     if (!appId) return;
@@ -130,7 +134,15 @@ export function AppDetailPage() {
               </button>
             )}
           </div>
-          <span className="text-sm text-gray-500">{user?.email}</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+            >
+              AI Assistant
+            </button>
+            <span className="text-sm text-gray-500">{user?.email}</span>
+          </div>
         </div>
       </header>
 
@@ -248,6 +260,19 @@ export function AppDetailPage() {
           </div>
         )}
       </main>
+
+      <AIChatPanel
+        appId={appId!}
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onDataChanged={() => {
+          if (!appId) return;
+          getApp(appId).then((res) => {
+            setApp(res.app);
+            setTypes(res.types);
+          });
+        }}
+      />
     </div>
   );
 }
