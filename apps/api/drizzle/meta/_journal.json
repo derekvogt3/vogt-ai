@@ -36,6 +36,20 @@
       "when": 1771362321001,
       "tag": "0004_awesome_risque",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771627146387,
+      "tag": "0005_slow_lord_tyger",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771886400000,
+      "tag": "0006_platform_rearchitecture",
+      "breakpoints": true
     }
   ]
 }

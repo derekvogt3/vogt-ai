@@ -9,6 +9,7 @@ const TEST_JWT_SECRET = 'test-secret-key-that-is-at-least-32-characters';
 // Queue to control what db queries return
 let selectResults: any[][] = [];
 let insertResults: any[][] = [];
+let updateResults: any[][] = [];
 
 vi.mock('../env.js', () => ({
   env: {
@@ -36,10 +37,18 @@ vi.mock('../db.js', () => {
       }),
     };
   }
+  function chainUpdate() {
+    return {
+      set: () => ({
+        where: () => Promise.resolve(updateResults.shift() ?? []),
+      }),
+    };
+  }
   return {
     db: {
       select: chainSelect,
       insert: chainInsert,
+      update: chainUpdate,
     },
   };
 });
@@ -97,33 +106,96 @@ describe('POST /api/auth/register', () => {
   beforeEach(() => {
     selectResults = [];
     insertResults = [];
+    updateResults = [];
   });
 
-  it('returns 201 and sets auth cookie on successful registration', async () => {
+  it('returns 201 and sets auth cookie on successful registration with invite code', async () => {
     const app = createApp();
-    selectResults.push([]); // no existing user
-    insertResults.push([{ id: '123e4567-e89b-12d3-a456-426614174000', email: 'test@example.com' }]);
+    // 1st select: find invite code (valid, unused)
+    selectResults.push([{
+      id: 'invite-id',
+      code: 'TESTCODE',
+      createdBy: 'admin-id',
+      usedBy: null,
+      expiresAt: null,
+      createdAt: new Date(),
+    }]);
+    // 2nd select: check existing user (none)
+    selectResults.push([]);
+    // insert: create user
+    insertResults.push([{
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      email: 'test@example.com',
+      role: 'user',
+    }]);
+    // update: mark invite code as used
+    updateResults.push([]);
 
     const res = await app.request(
-      post('/api/auth/register', { email: 'test@example.com', password: 'password123' })
+      post('/api/auth/register', {
+        email: 'test@example.com',
+        password: 'password123',
+        inviteCode: 'TESTCODE',
+      })
     );
 
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.user.email).toBe('test@example.com');
     expect(body.user.id).toBeDefined();
+    expect(body.user.role).toBe('user');
 
     const setCookie = res.headers.get('set-cookie');
     expect(setCookie).toContain('auth_token=');
     expect(setCookie).toContain('HttpOnly');
   });
 
-  it('returns 409 when email already exists', async () => {
+  it('returns 400 when invite code is missing', async () => {
     const app = createApp();
-    selectResults.push([{ id: 'existing-id' }]); // user exists
+    const res = await app.request(
+      post('/api/auth/register', { email: 'test@example.com', password: 'password123' })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when invite code is invalid', async () => {
+    const app = createApp();
+    // 1st select: invite code not found
+    selectResults.push([]);
 
     const res = await app.request(
-      post('/api/auth/register', { email: 'existing@example.com', password: 'password123' })
+      post('/api/auth/register', {
+        email: 'test@example.com',
+        password: 'password123',
+        inviteCode: 'BADCODE',
+      })
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid or already used invite code');
+  });
+
+  it('returns 409 when email already exists', async () => {
+    const app = createApp();
+    // 1st select: valid invite code
+    selectResults.push([{
+      id: 'invite-id',
+      code: 'TESTCODE',
+      createdBy: 'admin-id',
+      usedBy: null,
+      expiresAt: null,
+      createdAt: new Date(),
+    }]);
+    // 2nd select: user already exists
+    selectResults.push([{ id: 'existing-id' }]);
+
+    const res = await app.request(
+      post('/api/auth/register', {
+        email: 'existing@example.com',
+        password: 'password123',
+        inviteCode: 'TESTCODE',
+      })
     );
 
     expect(res.status).toBe(409);
@@ -134,7 +206,7 @@ describe('POST /api/auth/register', () => {
   it('returns 400 for invalid email', async () => {
     const app = createApp();
     const res = await app.request(
-      post('/api/auth/register', { email: 'not-an-email', password: 'password123' })
+      post('/api/auth/register', { email: 'not-an-email', password: 'password123', inviteCode: 'TESTCODE' })
     );
     expect(res.status).toBe(400);
   });
@@ -142,7 +214,7 @@ describe('POST /api/auth/register', () => {
   it('returns 400 for short password', async () => {
     const app = createApp();
     const res = await app.request(
-      post('/api/auth/register', { email: 'test@example.com', password: 'short' })
+      post('/api/auth/register', { email: 'test@example.com', password: 'short', inviteCode: 'TESTCODE' })
     );
     expect(res.status).toBe(400);
   });
@@ -163,6 +235,7 @@ describe('POST /api/auth/login', () => {
       id: '123e4567-e89b-12d3-a456-426614174000',
       email: 'test@example.com',
       passwordHash: hash,
+      role: 'user',
       createdAt: new Date(),
     }]);
 
@@ -173,6 +246,7 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.user.email).toBe('test@example.com');
+    expect(body.user.role).toBe('user');
 
     const setCookie = res.headers.get('set-cookie');
     expect(setCookie).toContain('auth_token=');
@@ -188,6 +262,7 @@ describe('POST /api/auth/login', () => {
       id: '123e4567-e89b-12d3-a456-426614174000',
       email: 'test@example.com',
       passwordHash: hash,
+      role: 'user',
       createdAt: new Date(),
     }]);
 
@@ -250,7 +325,7 @@ describe('GET /api/auth/me', () => {
 
     const now = Math.floor(Date.now() / 1000);
     const token = await sign(
-      { sub: '123e4567-e89b-12d3-a456-426614174000', email: 'test@example.com', iat: now, exp: now + 3600 },
+      { sub: '123e4567-e89b-12d3-a456-426614174000', email: 'test@example.com', role: 'user', iat: now, exp: now + 3600 },
       TEST_JWT_SECRET,
       'HS256'
     );
@@ -258,6 +333,7 @@ describe('GET /api/auth/me', () => {
     selectResults.push([{
       id: '123e4567-e89b-12d3-a456-426614174000',
       email: 'test@example.com',
+      role: 'user',
       createdAt: new Date('2024-01-01'),
     }]);
 
@@ -272,5 +348,6 @@ describe('GET /api/auth/me', () => {
     const body = await res.json();
     expect(body.user.email).toBe('test@example.com');
     expect(body.user.id).toBe('123e4567-e89b-12d3-a456-426614174000');
+    expect(body.user.role).toBe('user');
   });
 });

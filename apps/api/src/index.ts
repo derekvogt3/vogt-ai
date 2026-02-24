@@ -10,13 +10,9 @@ import { env } from './env.js';
 import { db } from './db.js';
 
 import { authRoutes } from './routes/auth-routes.js';
-import { appRoutes } from './routes/app-routes.js';
-import { recordRoutes } from './routes/record-routes.js';
-import { aiRoutes } from './routes/ai-routes.js';
-import { pageRoutes } from './routes/page-routes.js';
-import { automationRoutes } from './routes/automation-routes.js';
-import { aiGenerateRoutes } from './routes/ai-generate-routes.js';
-import { startAutomationDispatcher } from './automation-dispatcher.js';
+import { documentRoutes } from './routes/document-routes.js';
+import { adminRoutes } from './routes/admin-routes.js';
+import { serviceRoutes } from './routes/service-routes.js';
 
 const app = new Hono();
 
@@ -58,12 +54,9 @@ app.use('/api/*', async (c, next) => {
 // Routes (all protected by default — only PUBLIC_PATHS above are exempt)
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
 app.route('/api/auth', authRoutes);
-app.route('/api/apps', appRoutes);
-app.route('/api/apps', recordRoutes);
-app.route('/api/apps', aiRoutes);
-app.route('/api/apps', pageRoutes);
-app.route('/api/apps', automationRoutes);
-app.route('/api/apps', aiGenerateRoutes);
+app.route('/api/documents', documentRoutes);
+app.route('/api/admin', adminRoutes);
+app.route('/api/services', serviceRoutes);
 
 // React SPA at /app/*
 app.use(
@@ -82,9 +75,6 @@ app.get('*', serveStatic({ root: './static/marketing', path: 'index.html' }));
 
 // Run migrations and start server
 await migrate(db, { migrationsFolder: './drizzle' });
-
-// Start automation event dispatcher
-startAutomationDispatcher();
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`Server running on http://localhost:${info.port}`);

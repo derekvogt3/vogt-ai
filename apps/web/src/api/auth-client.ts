@@ -1,6 +1,7 @@
 export type User = {
   id: string;
   email: string;
+  role: 'admin' | 'user';
 };
 
 type AuthResponse = {
@@ -25,10 +26,10 @@ async function authFetch<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function register(email: string, password: string) {
+export function register(email: string, password: string, inviteCode: string) {
   return authFetch<AuthResponse>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, inviteCode }),
   });
 }
 
