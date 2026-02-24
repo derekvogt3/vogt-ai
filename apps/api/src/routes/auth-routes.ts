@@ -2,16 +2,17 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { sign } from 'hono/jwt';
 import { setCookie, deleteCookie } from 'hono/cookie';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { HTTPException } from 'hono/http-exception';
 import { db } from '../db.js';
-import { users } from '../schema.js';
+import { users, inviteCodes } from '../schema.js';
 import { env } from '../env.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  inviteCode: z.string().min(1, 'Invite code is required'),
 });
 
 const loginSchema = z.object({
@@ -21,11 +22,12 @@ const loginSchema = z.object({
 
 export const authRoutes = new Hono();
 
-async function setAuthCookie(c: any, userId: string, email: string) {
+async function setAuthCookie(c: any, userId: string, email: string, role: string) {
   const now = Math.floor(Date.now() / 1000);
   const payload = {
     sub: userId,
     email,
+    role,
     iat: now,
     exp: now + 60 * 60 * 24 * 7, // 7 days
   };
@@ -42,6 +44,23 @@ async function setAuthCookie(c: any, userId: string, email: string) {
 authRoutes.post('/register', async (c) => {
   const body = registerSchema.parse(await c.req.json());
 
+  // Validate invite code
+  const [invite] = await db
+    .select()
+    .from(inviteCodes)
+    .where(and(eq(inviteCodes.code, body.inviteCode), isNull(inviteCodes.usedBy)))
+    .limit(1);
+
+  if (!invite) {
+    throw new HTTPException(400, { message: 'Invalid or already used invite code' });
+  }
+
+  // Check expiration
+  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+    throw new HTTPException(400, { message: 'Invite code has expired' });
+  }
+
+  // Check if email already registered
   const existing = await db
     .select({ id: users.id })
     .from(users)
@@ -56,11 +75,17 @@ authRoutes.post('/register', async (c) => {
 
   const [newUser] = await db
     .insert(users)
-    .values({ email: body.email, passwordHash })
-    .returning({ id: users.id, email: users.email });
+    .values({ email: body.email, passwordHash, role: 'user' })
+    .returning({ id: users.id, email: users.email, role: users.role });
 
-  await setAuthCookie(c, newUser.id, newUser.email);
-  return c.json({ user: { id: newUser.id, email: newUser.email } }, 201);
+  // Mark invite code as used
+  await db
+    .update(inviteCodes)
+    .set({ usedBy: newUser.id, usedAt: new Date() })
+    .where(eq(inviteCodes.id, invite.id));
+
+  await setAuthCookie(c, newUser.id, newUser.email, newUser.role);
+  return c.json({ user: { id: newUser.id, email: newUser.email, role: newUser.role } }, 201);
 });
 
 authRoutes.post('/login', async (c) => {
@@ -76,8 +101,8 @@ authRoutes.post('/login', async (c) => {
     throw new HTTPException(401, { message: 'Invalid email or password' });
   }
 
-  await setAuthCookie(c, user.id, user.email);
-  return c.json({ user: { id: user.id, email: user.email } });
+  await setAuthCookie(c, user.id, user.email, user.role);
+  return c.json({ user: { id: user.id, email: user.email, role: user.role } });
 });
 
 authRoutes.post('/logout', (c) => {
@@ -89,7 +114,7 @@ authRoutes.get('/me', async (c) => {
   const payload = c.get('jwtPayload');
 
   const [user] = await db
-    .select({ id: users.id, email: users.email, createdAt: users.createdAt })
+    .select({ id: users.id, email: users.email, role: users.role, createdAt: users.createdAt })
     .from(users)
     .where(eq(users.id, payload.sub))
     .limit(1);

@@ -8,6 +8,7 @@ export function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -23,7 +24,7 @@ export function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await register(email, password);
+      await register(email, password, inviteCode);
       navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -47,6 +48,22 @@ export function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <label htmlFor="inviteCode" className="mb-1 block text-sm font-medium text-gray-700">
+              Invite Code
+            </label>
+            <input
+              id="inviteCode"
+              type="text"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              required
+              autoFocus
+              placeholder="Enter your invite code"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono tracking-wider focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
               Email
             </label>
@@ -56,7 +73,6 @@ export function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              autoFocus
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
