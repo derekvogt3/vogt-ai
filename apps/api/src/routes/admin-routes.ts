@@ -51,6 +51,26 @@ adminRoutes.get('/users', async (c) => {
   });
 });
 
+// DELETE /users/:id — delete a user and their service assignments
+adminRoutes.delete('/users/:id', async (c) => {
+  const id = c.req.param('id');
+  const payload = c.get('jwtPayload');
+
+  if (id === payload.sub) {
+    throw new HTTPException(400, { message: 'Cannot delete your own account' });
+  }
+
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1);
+  if (!existing) {
+    throw new HTTPException(404, { message: 'User not found' });
+  }
+
+  await db.delete(userServices).where(eq(userServices.userId, id));
+  await db.delete(users).where(eq(users.id, id));
+
+  return c.json({ success: true });
+});
+
 // PATCH /users/:id/role — change user role
 const roleSchema = z.object({
   role: z.enum(['admin', 'user']),
@@ -59,6 +79,18 @@ const roleSchema = z.object({
 adminRoutes.patch('/users/:id/role', async (c) => {
   const id = c.req.param('id');
   const body = roleSchema.parse(await c.req.json());
+
+  // Last-admin guard: prevent demoting the only admin
+  if (body.role === 'user') {
+    const [{ adminCount }] = await db
+      .select({ adminCount: sql<number>`count(*)::int` })
+      .from(users)
+      .where(eq(users.role, 'admin'));
+
+    if (adminCount <= 1) {
+      throw new HTTPException(400, { message: 'Cannot demote the last admin' });
+    }
+  }
 
   const [updated] = await db
     .update(users)

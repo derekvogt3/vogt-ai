@@ -7,6 +7,7 @@ import {
   getServices,
   createInviteCode,
   deleteInviteCode,
+  deleteUser,
   updateUserRole,
   grantServiceAccess,
   revokeServiceAccess,
@@ -87,13 +88,69 @@ export function AdminPage() {
   );
 }
 
+// ===================== CONFIRM DIALOG =====================
+
+type ConfirmDialogProps = {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  confirmLabel = 'Confirm',
+  danger = false,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+        <p className="mt-2 text-sm text-gray-500">{message}</p>
+        <div className="mt-5 flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
+              danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ===================== USERS PANEL =====================
 
+type PendingAction =
+  | { type: 'role'; userId: string; userEmail: string; currentRole: string }
+  | { type: 'delete'; userId: string; userEmail: string }
+  | { type: 'grantService'; userId: string; userEmail: string; serviceId: string; serviceName: string }
+  | { type: 'revokeService'; userId: string; userEmail: string; serviceId: string; serviceName: string };
+
 function UsersPanel() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [allServices, setAllServices] = useState<AdminService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -109,39 +166,62 @@ function UsersPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleRoleToggle = async (userId: string, currentRole: string) => {
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+  const handleConfirm = async () => {
+    if (!pendingAction) return;
+    const action = pendingAction;
+    setPendingAction(null);
     try {
-      await updateUserRole(userId, newRole);
+      if (action.type === 'role') {
+        const newRole = action.currentRole === 'admin' ? 'user' : 'admin';
+        await updateUserRole(action.userId, newRole);
+      } else if (action.type === 'delete') {
+        await deleteUser(action.userId);
+      } else if (action.type === 'grantService') {
+        await grantServiceAccess(action.userId, action.serviceId);
+      } else if (action.type === 'revokeService') {
+        await revokeServiceAccess(action.userId, action.serviceId);
+      }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update role');
-    }
-  };
-
-  const handleGrantService = async (userId: string, serviceId: string) => {
-    try {
-      await grantServiceAccess(userId, serviceId);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to grant access');
-    }
-  };
-
-  const handleRevokeService = async (userId: string, serviceId: string) => {
-    try {
-      await revokeServiceAccess(userId, serviceId);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke access');
+      setError(err instanceof Error ? err.message : 'Action failed');
     }
   };
 
   if (isLoading) return <div className="py-8 text-center text-gray-400">Loading users...</div>;
   if (error) return <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>;
 
+  const confirmTitle = (() => {
+    if (!pendingAction) return '';
+    if (pendingAction.type === 'delete') return 'Delete user';
+    if (pendingAction.type === 'role') return pendingAction.currentRole === 'admin' ? 'Remove admin access' : 'Grant admin access';
+    if (pendingAction.type === 'grantService') return 'Grant service access';
+    if (pendingAction.type === 'revokeService') return 'Revoke service access';
+    return '';
+  })();
+
+  const confirmMessage = (() => {
+    if (!pendingAction) return '';
+    if (pendingAction.type === 'delete') return `Permanently delete ${pendingAction.userEmail}? This cannot be undone.`;
+    if (pendingAction.type === 'role') return pendingAction.currentRole === 'admin'
+      ? `Remove admin role from ${pendingAction.userEmail}?`
+      : `Grant admin role to ${pendingAction.userEmail}?`;
+    if (pendingAction.type === 'grantService') return `Grant ${pendingAction.serviceName} access to ${pendingAction.userEmail}?`;
+    if (pendingAction.type === 'revokeService') return `Remove ${pendingAction.serviceName} access from ${pendingAction.userEmail}?`;
+    return '';
+  })();
+
   return (
     <div className="space-y-4">
+      <ConfirmDialog
+        isOpen={pendingAction !== null}
+        title={confirmTitle}
+        message={confirmMessage}
+        confirmLabel={pendingAction?.type === 'delete' ? 'Delete' : 'Confirm'}
+        danger={pendingAction?.type === 'delete' || pendingAction?.type === 'revokeService'}
+        onConfirm={handleConfirm}
+        onCancel={() => setPendingAction(null)}
+      />
+
       <h3 className="text-lg font-semibold text-gray-900">Users ({users.length})</h3>
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
@@ -151,67 +231,125 @@ function UsersPanel() {
               <th className="px-4 py-3 text-left font-medium text-gray-600">Role</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Services</th>
               <th className="px-4 py-3 text-left font-medium text-gray-600">Joined</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-b border-gray-50 last:border-0">
-                <td className="px-4 py-3 font-medium text-gray-900">{u.email}</td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => handleRoleToggle(u.id, u.role)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      u.role === 'admin'
-                        ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {u.role}
-                  </button>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {u.services.map((s) => (
-                      <span
-                        key={s.id}
-                        className="group inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
-                      >
-                        {s.name}
-                        <button
-                          onClick={() => handleRevokeService(u.id, s.id)}
-                          className="ml-0.5 text-blue-400 hover:text-red-500"
-                          title="Revoke access"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                    {/* Add service dropdown */}
-                    {allServices.filter((s) => !u.services.some((us) => us.id === s.id)).length > 0 && (
-                      <select
-                        className="rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-500"
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) handleGrantService(u.id, e.target.value);
-                        }}
-                      >
-                        <option value="">+ Add</option>
-                        {allServices
-                          .filter((s) => !u.services.some((us) => us.id === s.id))
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                      </select>
+            {users.map((u) => {
+              const isSelf = u.id === currentUser?.id;
+              return (
+                <tr key={u.id} className="border-b border-gray-50 last:border-0">
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {u.email}
+                    {isSelf && (
+                      <span className="ml-2 text-xs text-gray-400">(you)</span>
                     )}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-gray-500">
-                  {new Date(u.createdAt).toLocaleDateString()}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        u.role === 'admin'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {u.role}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {u.services.map((s) => (
+                        <span
+                          key={s.id}
+                          className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+                        >
+                          {s.name}
+                          <button
+                            onClick={() =>
+                              setPendingAction({
+                                type: 'revokeService',
+                                userId: u.id,
+                                userEmail: u.email,
+                                serviceId: s.id,
+                                serviceName: s.name,
+                              })
+                            }
+                            className="ml-0.5 text-blue-400 hover:text-red-500"
+                            title="Revoke access"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      {allServices.filter((s) => !u.services.some((us) => us.id === s.id)).length > 0 && (
+                        <select
+                          className="rounded border border-gray-200 px-1.5 py-0.5 text-xs text-gray-500"
+                          value=""
+                          onChange={(e) => {
+                            const serviceId = e.target.value;
+                            if (!serviceId) return;
+                            const svc = allServices.find((s) => s.id === serviceId);
+                            if (svc) {
+                              setPendingAction({
+                                type: 'grantService',
+                                userId: u.id,
+                                userEmail: u.email,
+                                serviceId: svc.id,
+                                serviceName: svc.name,
+                              });
+                            }
+                          }}
+                        >
+                          <option value="">+ Add</option>
+                          {allServices
+                            .filter((s) => !u.services.some((us) => us.id === s.id))
+                            .map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          setPendingAction({
+                            type: 'role',
+                            userId: u.id,
+                            userEmail: u.email,
+                            currentRole: u.role,
+                          })
+                        }
+                        className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                        title={u.role === 'admin' ? 'Remove admin' : 'Make admin'}
+                      >
+                        {u.role === 'admin' ? 'Demote' : 'Make Admin'}
+                      </button>
+                      {!isSelf && (
+                        <button
+                          onClick={() =>
+                            setPendingAction({
+                              type: 'delete',
+                              userId: u.id,
+                              userEmail: u.email,
+                            })
+                          }
+                          className="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

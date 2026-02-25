@@ -62,6 +62,12 @@ export function getUsers(): Promise<{ users: AdminUser[] }> {
   return adminFetch('/api/admin/users');
 }
 
+export function deleteUser(userId: string): Promise<{ success: boolean }> {
+  return adminFetch(`/api/admin/users/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
 export function updateUserRole(userId: string, role: 'admin' | 'user'): Promise<{ user: { id: string; email: string; role: string } }> {
   return adminFetch(`/api/admin/users/${userId}/role`, {
     method: 'PATCH',
