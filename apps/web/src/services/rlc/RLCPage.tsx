@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { useAuth } from '../hooks/use-auth';
+import { useAuth } from '../../hooks/use-auth';
 import {
   searchDocuments,
   getDocumentStats,
@@ -9,7 +9,7 @@ import {
   type DocumentStats,
   type DocumentDetail,
   type SearchResponse,
-} from '../api/documents-client';
+} from './api';
 
 const FILE_TYPE_COLORS: Record<string, string> = {
   pdf: 'bg-red-100 text-red-700',

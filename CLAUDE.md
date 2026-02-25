@@ -4,6 +4,8 @@
 
 vogt-ai is a client-facing AI services platform with invite-only registration, role-based access control, and per-user service assignments. Built as a pnpm monorepo with a Hono API backend, React frontend, and Astro marketing site, deployed as a single service on Railway.
 
+Each client/project gets its own service directory (`services/<name>/`) on both the API and frontend, with a shared database using table-name prefixes for isolation (e.g., `rlc_documents`).
+
 ## Tech Stack
 
 - **Marketing Site**: Astro 5 (static output) + Tailwind CSS 4
@@ -23,26 +25,31 @@ vogt-ai/
 ├── apps/
 │   ├── api/          # Hono backend — serves API + both frontends
 │   │   ├── drizzle/              # SQL migration files (committed to git)
-│   │   ├── drizzle.config.ts     # Drizzle Kit config
+│   │   ├── drizzle.config.ts     # Drizzle Kit config (multi-schema glob)
 │   │   ├── vitest.config.ts      # Test config
 │   │   └── src/
 │   │       ├── index.ts           # App entry, middleware, static file serving
 │   │       ├── env.ts             # Zod-validated environment variables
 │   │       ├── db.ts              # Drizzle + postgres.js connection
-│   │       ├── schema.ts          # Database tables (users, invite_codes, services, user_services, documents)
+│   │       ├── schema.ts          # Platform tables (users, invite_codes, services, user_services)
 │   │       ├── middleware/
-│   │       │   └── require-admin.ts  # Admin role check middleware
+│   │       │   ├── require-admin.ts    # Admin role check middleware
+│   │       │   └── require-service.ts  # Service-level access control middleware
 │   │       ├── routes/
 │   │       │   ├── auth-routes.ts      # POST register (with invite code)/login/logout, GET me
 │   │       │   ├── auth-routes.test.ts # Auth route tests
 │   │       │   ├── admin-routes.ts     # User management, invite codes, service assignments (admin only)
-│   │       │   ├── service-routes.ts   # GET /services/mine (user's assigned services)
-│   │       │   └── document-routes.ts  # Document search, stats, detail (RLC Controls)
+│   │       │   └── service-routes.ts   # GET /services/mine (user's assigned services)
+│   │       ├── services/
+│   │       │   └── rlc/               # RL Controls — first client service
+│   │       │       ├── schema.ts       # rlc_documents table definition
+│   │       │       ├── routes.ts       # Document search, stats, detail endpoints
+│   │       │       └── scripts/
+│   │       │           ├── ingest.ts   # Dropbox → PostgreSQL document ingestion pipeline
+│   │       │           ├── search.ts   # CLI document search tool
+│   │       │           └── explore.ts  # Dropbox API file explorer
 │   │       └── scripts/
-│   │           ├── bootstrap-admin.ts  # Promote user to admin + seed services
-│   │           ├── dropbox-ingest.ts   # Dropbox → PostgreSQL document ingestion pipeline
-│   │           ├── dropbox-search.ts   # CLI document search tool
-│   │           └── dropbox-explore.ts  # Dropbox API file explorer
+│   │           └── seed.ts            # Promote admin + seed services + optional password reset
 │   ├── marketing/    # Astro static marketing site — served at /
 │   │   ├── astro.config.mjs
 │   │   └── src/
@@ -56,19 +63,22 @@ vogt-ai/
 │           ├── api/
 │           │   ├── auth-client.ts        # Auth API fetch wrappers (login, register w/ invite code)
 │           │   ├── admin-client.ts       # Admin API client (users, invite codes, services)
-│           │   ├── services-client.ts    # Service listing API client
-│           │   └── documents-client.ts   # Document search/stats/detail API client
+│           │   └── services-client.ts    # Service listing API client
 │           ├── hooks/
 │           │   └── use-auth.ts           # AuthContext + useAuth hook
-│           └── components/
-│               ├── AuthProvider.tsx       # Auth context provider
-│               ├── ProtectedRoute.tsx     # Redirects to /app/login if unauthenticated
-│               ├── AdminRoute.tsx         # Redirects to /app if not admin
-│               ├── LoginPage.tsx          # Login form
-│               ├── RegisterPage.tsx       # Register form (requires invite code)
-│               ├── DashboardPage.tsx      # Service dashboard (home page)
-│               ├── AdminPage.tsx          # Admin panel (users, invite codes, services)
-│               └── RLCPage.tsx            # RL Controls document search UI
+│           ├── components/
+│           │   ├── AuthProvider.tsx       # Auth context provider
+│           │   ├── ProtectedRoute.tsx     # Redirects to /app/login if unauthenticated
+│           │   ├── AdminRoute.tsx         # Redirects to /app if not admin
+│           │   ├── ServiceRoute.tsx       # Checks service access before rendering
+│           │   ├── LoginPage.tsx          # Login form
+│           │   ├── RegisterPage.tsx       # Register form (requires invite code)
+│           │   ├── DashboardPage.tsx      # Service dashboard (home page)
+│           │   └── AdminPage.tsx          # Admin panel (users, invite codes, services)
+│           └── services/
+│               └── rlc/                  # RL Controls frontend
+│                   ├── RLCPage.tsx        # Document search UI
+│                   └── api.ts            # Document search/stats/detail API client
 ├── package.json
 ├── pnpm-workspace.yaml
 └── tsconfig.base.json
@@ -96,7 +106,8 @@ In production, the Hono API serves `/api/*` routes, the React platform app at `/
 - **Invite-only registration**: Users must provide a valid invite code (generated by admin) to register. Codes are single-use and can have expiration dates.
 - **Roles**: Users have a `role` field (`admin` | `user`). Role is included in the JWT payload.
 - **Admin middleware**: `requireAdmin` middleware checks `jwtPayload.role === 'admin'` and returns 403 if not.
-- **Service access**: Users are assigned specific services via `user_services` join table. Admins see all enabled services.
+- **Service access middleware**: `requireService(slug)` middleware checks `user_services` join table. Admins bypass all service checks. Returns 403 if user doesn't have access.
+- **Service access (frontend)**: `ServiceRoute` component checks `/api/services/mine` before rendering. Admins bypass. Users without access are redirected to dashboard. This is defense-in-depth — the real enforcement is server-side.
 - **JWT in httpOnly cookies**: Tokens are set as `httpOnly`, `secure` (production), `sameSite=Lax` cookies with 7-day expiry. JWT payload includes `sub`, `email`, `role`.
 - **Password hashing**: bcryptjs with cost factor 12
 - **Frontend flow**: Unauthenticated users are redirected to `/app/login`. After login/register, redirected to `/app` (dashboard). `AuthProvider` checks `/api/auth/me` on mount to restore sessions.
@@ -107,18 +118,37 @@ In production, the Hono API serves `/api/*` routes, the React platform app at `/
 |---|---|
 | `users` | User accounts with email, passwordHash, role (admin/user) |
 | `invite_codes` | Single-use registration codes created by admins |
-| `services` | Available services on the platform (slug, name, description, route) |
+| `services` | Available services on the platform (slug, name, description, route, enabled) |
 | `user_services` | Join table: which users have access to which services |
-| `documents` | Indexed documents from Dropbox with full-text search (tsvector + GIN index) |
+| `rlc_documents` | Indexed documents from Dropbox with full-text search (tsvector + GIN index) |
+
+### Multi-service pattern
+
+Each client/project is isolated in its own `services/<name>/` directory on both API and frontend:
+- **API schema**: `apps/api/src/services/<name>/schema.ts` — table definitions prefixed with the service name (e.g., `rlc_documents`)
+- **API routes**: `apps/api/src/services/<name>/routes.ts` — service-specific endpoints
+- **API scripts**: `apps/api/src/services/<name>/scripts/` — CLI utilities for the service
+- **Frontend**: `apps/web/src/services/<name>/` — React components and API clients
+- **Access control**: `requireService('<slug>')` middleware on API routes + `<ServiceRoute slug="<slug>">` wrapper on frontend routes
+- **Drizzle config**: Uses glob `['./src/schema.ts', './src/services/*/schema.ts']` to pick up all schema files
+
+To add a new service:
+1. Create `apps/api/src/services/<name>/schema.ts` with prefixed table names
+2. Create `apps/api/src/services/<name>/routes.ts` with endpoints
+3. Add `requireService('<slug>')` + `app.route()` in `index.ts`
+4. Create `apps/web/src/services/<name>/` with components and API client
+5. Add route in `App.tsx` wrapped with `<ServiceRoute slug="<slug>">`
+6. Add service definition to `SERVICE_DEFINITIONS` in `seed.ts`
+7. Run `db:generate` and `db:migrate`
 
 ### Document Search (RLC Controls)
 
 The platform includes a full-text search system for ~12,500 documents (45M words) from a Dropbox folder, indexed into PostgreSQL:
 
-- **Backend**: `document-routes.ts` — search (FTS with ranking + snippets), stats, document detail
-- **Frontend**: `RLCPage.tsx` — search bar, file type filter, result cards with highlighted snippets, document detail panel
+- **Backend**: `services/rlc/routes.ts` — search (FTS with ranking + snippets), stats, document detail
+- **Frontend**: `services/rlc/RLCPage.tsx` — search bar, file type filter, result cards with highlighted snippets, document detail panel
 - **Search**: Uses PostgreSQL `tsvector`, `plainto_tsquery`, `ts_rank`, and `ts_headline` with `<mark>` tags
-- **Utility scripts**: `dropbox-ingest.ts` (ingestion pipeline), `dropbox-search.ts` (CLI search), `dropbox-explore.ts` (file explorer)
+- **Utility scripts**: `services/rlc/scripts/ingest.ts` (ingestion pipeline), `search.ts` (CLI search), `explore.ts` (file explorer)
 
 ## Development
 
@@ -145,15 +175,22 @@ pnpm --filter @vogt-ai/api db:studio    # Open Drizzle Studio GUI
 
 Migrations auto-run on server startup via `migrate()` in `index.ts`.
 
-### Admin Bootstrap
+### Seeding (admin + services)
 
-After deploying the new schema, bootstrap the first admin and seed services:
+After deploying or setting up a new environment, seed the admin user and services:
 
 ```bash
-pnpm --filter @vogt-ai/api tsx src/scripts/bootstrap-admin.ts <email>
+# Local (uses .env for DATABASE_URL)
+pnpm --filter @vogt-ai/api seed <email>
+
+# With password reset (useful for dev)
+pnpm --filter @vogt-ai/api seed <email> -- --reset-password <newpass>
+
+# Against Railway production
+DATABASE_URL="postgresql://..." pnpm --filter @vogt-ai/api seed <email>
 ```
 
-This promotes a registered user to admin, creates the RLC Controls service, and grants the admin access.
+This promotes a registered user to admin, creates all service records from `SERVICE_DEFINITIONS`, and grants the admin access to each service.
 
 ## Environment Variables
 
@@ -161,6 +198,7 @@ This promotes a registered user to admin, creates the RLC Controls service, and 
 |---|---|---|---|
 | `DATABASE_URL` | Yes | — | PostgreSQL connection string |
 | `JWT_SECRET` | Yes | — | JWT signing secret (min 32 chars) |
+| `ANTHROPIC_API_KEY` | Yes | — | Anthropic API key |
 | `CORS_ORIGIN` | No | `http://localhost:5173` | Allowed CORS origin (local dev) |
 | `PORT` | No | `3000` | Server port |
 
@@ -178,6 +216,15 @@ Production (Railway): set in Railway Variables tab. No `.env` file needed.
 - **PostgreSQL**: Add Railway PostgreSQL plugin (auto-provisions `DATABASE_URL`)
 - **JWT_SECRET**: Generate with `openssl rand -base64 48`, add to Railway Variables
 
+### Production setup after first deploy
+
+1. Migrations run automatically on server startup
+2. Register an account via `/app/register` (requires invite code — for the very first user, insert one manually into the `invite_codes` table)
+3. Run the seed script to promote admin and create services:
+   ```bash
+   DATABASE_URL="postgresql://..." pnpm --filter @vogt-ai/api seed <email>
+   ```
+
 ## API Endpoints
 
 | Method | Path | Auth | Description |
@@ -188,9 +235,9 @@ Production (Railway): set in Railway Variables tab. No `.env` file needed.
 | POST | `/api/auth/logout` | Public | Logout. Clears auth cookie |
 | GET | `/api/auth/me` | Protected | Get current user (id, email, role) |
 | GET | `/api/services/mine` | Protected | List services user has access to |
-| GET | `/api/documents/search` | Protected | Full-text search. Query: `q, type, limit, page` |
-| GET | `/api/documents/stats` | Protected | Corpus statistics |
-| GET | `/api/documents/:id` | Protected | Full document detail with extracted text |
+| GET | `/api/documents/search` | Service: rlc-controls | Full-text search. Query: `q, type, limit, page` |
+| GET | `/api/documents/stats` | Service: rlc-controls | Corpus statistics |
+| GET | `/api/documents/:id` | Service: rlc-controls | Full document detail with extracted text |
 | GET | `/api/admin/users` | Admin | List all users with service assignments |
 | PATCH | `/api/admin/users/:id/role` | Admin | Change user role |
 | POST | `/api/admin/invite-codes` | Admin | Generate invite code |
@@ -204,8 +251,10 @@ Production (Railway): set in Railway Variables tab. No `.env` file needed.
 
 - **Protect-by-default middleware**: Global JWT middleware on `/api/*` with `PUBLIC_PATHS` whitelist — any new route is automatically protected
 - **Role in JWT**: JWT payload includes `role`, checked by `requireAdmin` middleware for admin routes
+- **Service access enforcement**: `requireService(slug)` middleware checks `user_services` table. Admins bypass. Applied per-service in `index.ts`. Frontend `ServiceRoute` component provides defense-in-depth.
 - **Invite-code registration**: No open registration. Admin generates codes, users provide code to register.
 - **Service access model**: `services` table defines available services; `user_services` join table controls per-user access; admins see all enabled services
+- **Service isolation**: Each service lives in `services/<name>/` with its own schema, routes, scripts, and frontend. Table names are prefixed (e.g., `rlc_*`).
 - **Thin routes**: Route handlers validate input → query DB → return response
 - **Zod everywhere**: Request validation, env var validation, error middleware catches ZodError
 - **Hono built-ins**: Uses `hono/jwt` (sign, verify, middleware) and `hono/cookie` — no external JWT/cookie libraries
@@ -221,14 +270,19 @@ Production (Railway): set in Railway Variables tab. No `.env` file needed.
 
 ## Utility Scripts
 
-Located in `apps/api/src/scripts/`:
+### Platform scripts (`apps/api/src/scripts/`)
+
+| Script | Command | Purpose |
+|---|---|---|
+| `seed.ts` | `pnpm --filter @vogt-ai/api seed <email>` | Promote admin, seed services, optional password reset |
+
+### RLC service scripts (`apps/api/src/services/rlc/scripts/`)
 
 | Script | Purpose |
 |---|---|
-| `bootstrap-admin.ts` | Promote user to admin, seed services |
-| `dropbox-ingest.ts` | Ingest documents from Dropbox into PostgreSQL (resumable) |
-| `dropbox-search.ts` | CLI full-text search tool |
-| `dropbox-explore.ts` | List files in Dropbox via API |
+| `ingest.ts` | Ingest documents from Dropbox into PostgreSQL (resumable) |
+| `search.ts` | CLI full-text search tool |
+| `explore.ts` | List files in Dropbox via API |
 
 ## Conventions
 

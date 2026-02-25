@@ -1,14 +1,19 @@
 # CONVENTIONS
 
 ## Architecture
-- Monorepo: pnpm workspaces. Two packages: @vogt-ai/web (Vite React), @vogt-ai/api (Hono).
+- Monorepo: pnpm workspaces. Three packages: @vogt-ai/web (Vite React), @vogt-ai/api (Hono), @vogt-ai/marketing (Astro).
 - Single language: TypeScript end-to-end.
-- Conversation history lives in React state (client-side). Sent with each API request.
+- Multi-service platform: each client/project gets its own services/<name>/ directory on both API and frontend.
+- Access control: requireService(slug) middleware on API + ServiceRoute component on frontend.
 
 ## File Organization
 - Colocate related code. One file per domain concept where possible.
-- Flat route files in apps/api/src/routes/.
-- Frontend components in apps/web/src/components/.
+- Platform routes in apps/api/src/routes/ (auth, admin, services).
+- Platform components in apps/web/src/components/.
+- Per-service code in apps/api/src/services/<name>/ (schema, routes, scripts).
+- Per-service frontend in apps/web/src/services/<name>/ (pages, API clients).
+- Service tables use name-prefixed tables (e.g., rlc_documents) for isolation.
+- Each service has its own schema.ts picked up by Drizzle's glob config.
 
 ## Naming
 - Files: kebab-case (e.g., chat-routes.ts, use-chat.ts).
