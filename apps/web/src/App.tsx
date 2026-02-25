@@ -4,9 +4,10 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { DashboardPage } from './components/DashboardPage';
-import { RLCPage } from './components/RLCPage';
 import { AdminPage } from './components/AdminPage';
 import { AdminRoute } from './components/AdminRoute';
+import { ServiceRoute } from './components/ServiceRoute';
+import { RLCPage } from './services/rlc/RLCPage';
 
 export default function App() {
   return (
@@ -26,12 +27,14 @@ export default function App() {
             }
           />
 
-          {/* Services */}
+          {/* Services — each wrapped with ServiceRoute for access control */}
           <Route
             path="/rlc"
             element={
               <ProtectedRoute>
-                <RLCPage />
+                <ServiceRoute slug="rlc-controls">
+                  <RLCPage />
+                </ServiceRoute>
               </ProtectedRoute>
             }
           />

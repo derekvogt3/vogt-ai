@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, text, bigint, integer, boolean, unique } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, text, boolean, unique } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -38,20 +38,3 @@ export const userServices = pgTable('user_services', {
 }, (table) => [
   unique().on(table.userId, table.serviceId),
 ]);
-
-export const documents = pgTable('documents', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  dropboxPath: text('dropbox_path').notNull().unique(),
-  fileName: text('file_name').notNull(),
-  fileType: varchar('file_type', { length: 20 }).notNull(),
-  fileSizeBytes: bigint('file_size_bytes', { mode: 'number' }),
-  extractedText: text('extracted_text'),
-  textPreview: text('text_preview'),
-  status: varchar('status', { length: 20 }).notNull().default('pending'),
-  errorMessage: text('error_message'),
-  dropboxModified: timestamp('dropbox_modified', { withTimezone: true }),
-  pageCount: integer('page_count'),
-  wordCount: integer('word_count'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});

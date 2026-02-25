@@ -31,12 +31,12 @@ function parseArgs() {
   }
 
   if (!query) {
-    console.log('Usage: dropbox-search.ts <query> [--type pdf|docx|xlsx|msg|eml] [--limit N]');
+    console.log('Usage: search.ts <query> [--type pdf|docx|xlsx|msg|eml] [--limit N]');
     console.log('\nExamples:');
-    console.log('  dropbox-search.ts "delay notice"');
-    console.log('  dropbox-search.ts "CDR review" --type pdf');
-    console.log('  dropbox-search.ts "site readiness" --limit 50');
-    console.log('  dropbox-search.ts "WCS installation" --type msg');
+    console.log('  search.ts "delay notice"');
+    console.log('  search.ts "CDR review" --type pdf');
+    console.log('  search.ts "site readiness" --limit 50');
+    console.log('  search.ts "WCS installation" --type msg');
     process.exit(0);
   }
 
@@ -67,7 +67,7 @@ async function main() {
         plainto_tsquery('english', ${query}),
         'StartSel=>>>, StopSel=<<<, MaxWords=40, MinWords=20, MaxFragments=2, FragmentDelimiter= ... '
       ) AS snippet
-    FROM documents
+    FROM rlc_documents
     WHERE text_search @@ plainto_tsquery('english', ${query})
     ${typeFilter}
     ORDER BY rank DESC
@@ -78,7 +78,7 @@ async function main() {
     console.log('No results found.');
     console.log('\nTip: Try simpler terms, or check document statuses:');
     const stats = await db.execute(
-      sql`SELECT status, count(*)::int as count FROM documents GROUP BY status ORDER BY count DESC`
+      sql`SELECT status, count(*)::int as count FROM rlc_documents GROUP BY status ORDER BY count DESC`
     );
     for (const row of stats as any[]) {
       console.log(`  ${row.status}: ${row.count}`);
@@ -116,7 +116,7 @@ async function main() {
 
   // Show total indexed stats
   const totalStats = await db.execute(
-    sql`SELECT count(*)::int as total, count(*) FILTER (WHERE status = 'completed')::int as indexed FROM documents`
+    sql`SELECT count(*)::int as total, count(*) FILTER (WHERE status = 'completed')::int as indexed FROM rlc_documents`
   );
   const stats = (totalStats as any[])[0];
   console.log(`\n${stats.indexed} documents indexed out of ${stats.total} total.`);

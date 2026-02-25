@@ -6,3 +6,4 @@ dist/
 .vercel
 .DS_Store
 apps/api/static/
+apps/api/data/

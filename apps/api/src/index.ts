@@ -10,9 +10,10 @@ import { env } from './env.js';
 import { db } from './db.js';
 
 import { authRoutes } from './routes/auth-routes.js';
-import { documentRoutes } from './routes/document-routes.js';
 import { adminRoutes } from './routes/admin-routes.js';
 import { serviceRoutes } from './routes/service-routes.js';
+import { rlcRoutes } from './services/rlc/routes.js';
+import { requireService } from './middleware/require-service.js';
 
 const app = new Hono();
 
@@ -54,9 +55,13 @@ app.use('/api/*', async (c, next) => {
 // Routes (all protected by default — only PUBLIC_PATHS above are exempt)
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
 app.route('/api/auth', authRoutes);
-app.route('/api/documents', documentRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/services', serviceRoutes);
+
+// Service routes — each service is access-controlled via requireService
+app.use('/api/documents', requireService('rlc-controls'));
+app.use('/api/documents/*', requireService('rlc-controls'));
+app.route('/api/documents', rlcRoutes);
 
 // React SPA at /app/*
 app.use(

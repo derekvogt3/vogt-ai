@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { db } from '../db.js';
+import { db } from '../../db.js';
 import { sql } from 'drizzle-orm';
 
-export const documentRoutes = new Hono();
+export const rlcRoutes = new Hono();
 
 // GET /search?q=...&type=...&limit=...&page=...
 const searchSchema = z.object({
@@ -13,7 +13,7 @@ const searchSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
 });
 
-documentRoutes.get('/search', async (c) => {
+rlcRoutes.get('/search', async (c) => {
   const parsed = searchSchema.parse(c.req.query());
   const { q, type, limit, page } = parsed;
   const offset = (page - 1) * limit;
@@ -39,7 +39,7 @@ documentRoutes.get('/search', async (c) => {
           plainto_tsquery('english', ${q}),
           'StartSel=<mark>, StopSel=</mark>, MaxWords=40, MinWords=20, MaxFragments=3, FragmentDelimiter= ... '
         ) AS snippet
-      FROM documents
+      FROM rlc_documents
       WHERE text_search @@ plainto_tsquery('english', ${q})
         AND status = 'completed'
         ${typeFilter}
@@ -48,7 +48,7 @@ documentRoutes.get('/search', async (c) => {
     `),
     db.execute(sql`
       SELECT count(*)::int AS total
-      FROM documents
+      FROM rlc_documents
       WHERE text_search @@ plainto_tsquery('english', ${q})
         AND status = 'completed'
         ${typeFilter}
@@ -80,28 +80,28 @@ documentRoutes.get('/search', async (c) => {
 });
 
 // GET /stats — must be before /:id so "stats" isn't treated as a UUID
-documentRoutes.get('/stats', async (c) => {
+rlcRoutes.get('/stats', async (c) => {
   const [mainStats, typeBreakdown, statusBreakdown] = await Promise.all([
     db.execute(sql`
       SELECT
         count(*)::int AS total_documents,
         count(*) FILTER (WHERE status = 'completed')::int AS indexed_documents,
         coalesce(sum(word_count) FILTER (WHERE status = 'completed'), 0)::bigint AS total_words
-      FROM documents
+      FROM rlc_documents
     `),
     db.execute(sql`
       SELECT
         file_type,
         count(*)::int AS count,
         coalesce(sum(word_count), 0)::bigint AS total_words
-      FROM documents
+      FROM rlc_documents
       WHERE status = 'completed'
       GROUP BY file_type
       ORDER BY count DESC
     `),
     db.execute(sql`
       SELECT status, count(*)::int AS count
-      FROM documents
+      FROM rlc_documents
       GROUP BY status
       ORDER BY count DESC
     `),
@@ -126,7 +126,7 @@ documentRoutes.get('/stats', async (c) => {
 });
 
 // GET /:id — full document detail (after /search and /stats)
-documentRoutes.get('/:id', async (c) => {
+rlcRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
 
   const rows = await db.execute(sql`
@@ -135,7 +135,7 @@ documentRoutes.get('/:id', async (c) => {
       file_size_bytes, page_count, dropbox_modified, status,
       extracted_text, text_preview, error_message,
       created_at, updated_at
-    FROM documents
+    FROM rlc_documents
     WHERE id = ${id}
     LIMIT 1
   `);

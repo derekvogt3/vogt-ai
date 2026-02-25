@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import postgres from 'postgres';
 import { readFileSync } from 'node:fs';
 import { resolve, extname } from 'node:path';
-import { documents } from '../schema.js';
+import { rlcDocuments } from '../schema.js';
 
 // --- Config ---
 
@@ -187,7 +187,7 @@ async function main() {
   const dbx = createDropboxClient();
 
   // 1. Load manifest
-  const manifestPath = resolve(import.meta.dirname, '..', '..', 'dropbox-manifest.json');
+  const manifestPath = resolve(import.meta.dirname, '..', '..', '..', '..', 'dropbox-manifest.json');
   console.log(`Loading manifest from ${manifestPath}...`);
   const manifest: ManifestEntry[] = JSON.parse(readFileSync(manifestPath, 'utf-8'));
   console.log(`Manifest: ${manifest.length} total files`);
@@ -213,7 +213,7 @@ async function main() {
     const errorMsg = file.sizeBytes > MAX_FILE_SIZE ? `File too large: ${(file.sizeBytes / 1024 / 1024).toFixed(1)}MB (max ${MAX_FILE_SIZE / 1024 / 1024}MB)` : null;
 
     try {
-      await db.insert(documents).values({
+      await db.insert(rlcDocuments).values({
         dropboxPath: file.path,
         fileName: file.name,
         fileType: ext,
@@ -231,9 +231,9 @@ async function main() {
 
   // 4. Query pending rows
   const pendingRows = await db.select()
-    .from(documents)
-    .where(eq(documents.status, 'pending'))
-    .orderBy(documents.fileSizeBytes);
+    .from(rlcDocuments)
+    .where(eq(rlcDocuments.status, 'pending'))
+    .orderBy(rlcDocuments.fileSizeBytes);
 
   const toProcess = limit > 0 ? pendingRows.slice(0, limit) : pendingRows;
   console.log(`\nPending: ${pendingRows.length} files. Processing: ${toProcess.length}\n`);
@@ -248,9 +248,9 @@ async function main() {
 
     try {
       // Mark as processing
-      await db.update(documents)
+      await db.update(rlcDocuments)
         .set({ status: 'processing', updatedAt: new Date() })
-        .where(eq(documents.id, doc.id));
+        .where(eq(rlcDocuments.id, doc.id));
 
       // Download from Dropbox
       const response = await dbx.filesDownload({ path: doc.dropboxPath });
@@ -269,7 +269,7 @@ async function main() {
       if (!text || text.trim().length === 0) {
         // Empty text — might be scanned PDF or image-based
         const status = ext === '.pdf' ? 'ocr_needed' : 'completed';
-        await db.update(documents)
+        await db.update(rlcDocuments)
           .set({
             extractedText: '',
             textPreview: '',
@@ -279,12 +279,12 @@ async function main() {
             errorMessage: status === 'ocr_needed' ? 'No text extracted - may be scanned/image-based PDF' : null,
             updatedAt: new Date(),
           })
-          .where(eq(documents.id, doc.id));
+          .where(eq(rlcDocuments.id, doc.id));
       } else {
         const wordCount = text.split(/\s+/).filter(Boolean).length;
         const preview = text.slice(0, 500).replace(/\s+/g, ' ').trim();
 
-        await db.update(documents)
+        await db.update(rlcDocuments)
           .set({
             extractedText: text,
             textPreview: preview,
@@ -294,20 +294,20 @@ async function main() {
             errorMessage: null,
             updatedAt: new Date(),
           })
-          .where(eq(documents.id, doc.id));
+          .where(eq(rlcDocuments.id, doc.id));
       }
 
       completed++;
     } catch (err: any) {
       failed++;
       const errMsg = err.message || String(err);
-      await db.update(documents)
+      await db.update(rlcDocuments)
         .set({
           status: 'failed',
           errorMessage: errMsg.slice(0, 1000),
           updatedAt: new Date(),
         })
-        .where(eq(documents.id, doc.id));
+        .where(eq(rlcDocuments.id, doc.id));
     }
 
     // Progress log every 10 files
@@ -333,7 +333,7 @@ async function main() {
 
   // Show status breakdown
   const statusCounts = await db.execute(
-    sql`SELECT status, count(*)::int as count FROM documents GROUP BY status ORDER BY count DESC`
+    sql`SELECT status, count(*)::int as count FROM rlc_documents GROUP BY status ORDER BY count DESC`
   );
   console.log('\nDocument status breakdown:');
   for (const row of statusCounts as any[]) {

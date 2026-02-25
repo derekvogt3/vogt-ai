@@ -50,6 +50,13 @@
       "when": 1771886400000,
       "tag": "0006_platform_rearchitecture",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772000000000,
+      "tag": "0007_rename_documents_to_rlc",
+      "breakpoints": true
     }
   ]
 }
