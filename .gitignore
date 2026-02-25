@@ -7,3 +7,4 @@ dist/
 .DS_Store
 apps/api/static/
 apps/api/data/
+apps/api/src/services/rlc/dropbox-manifest.json

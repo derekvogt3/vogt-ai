@@ -251,7 +251,7 @@ async function main() {
   printSizeAnalysis(files);
   findIssues(files);
 
-  const manifestPath = resolve(import.meta.dirname, '..', '..', '..', '..', 'dropbox-manifest.json');
+  const manifestPath = resolve(import.meta.dirname, '..', 'dropbox-manifest.json');
   saveManifest(files, manifestPath);
 }
 

@@ -187,7 +187,7 @@ async function main() {
   const dbx = createDropboxClient();
 
   // 1. Load manifest
-  const manifestPath = resolve(import.meta.dirname, '..', '..', '..', '..', 'dropbox-manifest.json');
+  const manifestPath = resolve(import.meta.dirname, '..', 'dropbox-manifest.json');
   console.log(`Loading manifest from ${manifestPath}...`);
   const manifest: ManifestEntry[] = JSON.parse(readFileSync(manifestPath, 'utf-8'));
   console.log(`Manifest: ${manifest.length} total files`);
@@ -218,6 +218,7 @@ async function main() {
         fileName: file.name,
         fileType: ext,
         fileSizeBytes: file.sizeBytes,
+        directoryPath: file.path.substring(0, file.path.lastIndexOf('/')),
         status,
         errorMessage: errorMsg,
         dropboxModified: file.serverModified ? new Date(file.serverModified) : null,

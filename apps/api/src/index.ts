@@ -13,6 +13,7 @@ import { authRoutes } from './routes/auth-routes.js';
 import { adminRoutes } from './routes/admin-routes.js';
 import { serviceRoutes } from './routes/service-routes.js';
 import { rlcRoutes } from './services/rlc/routes.js';
+import { rlcChatRoutes } from './services/rlc/chat-routes.js';
 import { requireService } from './middleware/require-service.js';
 
 const app = new Hono();
@@ -62,6 +63,7 @@ app.route('/api/services', serviceRoutes);
 app.use('/api/documents', requireService('rlc-controls'));
 app.use('/api/documents/*', requireService('rlc-controls'));
 app.route('/api/documents', rlcRoutes);
+app.route('/api/documents', rlcChatRoutes);
 
 // React SPA at /app/*
 app.use(

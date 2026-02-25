@@ -1,0 +1,2 @@
+ALTER TABLE "rlc_documents" ADD COLUMN "directory_path" text;--> statement-breakpoint
+UPDATE "rlc_documents" SET "directory_path" = substring("dropbox_path" FROM 1 FOR length("dropbox_path") - length("file_name") - 1) WHERE "directory_path" IS NULL;
