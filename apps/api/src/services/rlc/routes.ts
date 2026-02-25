@@ -5,21 +5,33 @@ import { sql } from 'drizzle-orm';
 
 export const rlcRoutes = new Hono();
 
-// GET /search?q=...&type=...&limit=...&page=...
+// Dropbox URL builder — uses ?preview= format
+function buildDropboxUrl(dropboxPath: string, fileName: string): string {
+  const dirPath = dropboxPath.substring(0, dropboxPath.lastIndexOf('/'));
+  const encodedDir = dirPath
+    .split('/')
+    .map((s) => encodeURIComponent(s))
+    .join('/');
+  return `https://www.dropbox.com/home${encodedDir}?preview=${encodeURIComponent(fileName)}`;
+}
+
+// GET /search?q=...&type=...&directory=...&limit=...&page=...
 const searchSchema = z.object({
   q: z.string().min(1),
   type: z.string().optional(),
+  directory: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   page: z.coerce.number().int().min(1).default(1),
 });
 
 rlcRoutes.get('/search', async (c) => {
   const parsed = searchSchema.parse(c.req.query());
-  const { q, type, limit, page } = parsed;
+  const { q, type, directory, limit, page } = parsed;
   const offset = (page - 1) * limit;
   const start = performance.now();
 
   const typeFilter = type ? sql` AND file_type = ${type}` : sql``;
+  const dirFilter = directory ? sql` AND directory_path LIKE ${directory + '%'}` : sql``;
 
   const [results, countResult] = await Promise.all([
     db.execute(sql`
@@ -28,6 +40,7 @@ rlcRoutes.get('/search', async (c) => {
         file_name,
         file_type,
         dropbox_path,
+        directory_path,
         word_count,
         file_size_bytes,
         page_count,
@@ -43,6 +56,7 @@ rlcRoutes.get('/search', async (c) => {
       WHERE text_search @@ plainto_tsquery('english', ${q})
         AND status = 'completed'
         ${typeFilter}
+        ${dirFilter}
       ORDER BY rank DESC
       LIMIT ${limit} OFFSET ${offset}
     `),
@@ -52,6 +66,7 @@ rlcRoutes.get('/search', async (c) => {
       WHERE text_search @@ plainto_tsquery('english', ${q})
         AND status = 'completed'
         ${typeFilter}
+        ${dirFilter}
     `),
   ]);
 
@@ -64,6 +79,8 @@ rlcRoutes.get('/search', async (c) => {
       fileName: r.file_name,
       fileType: r.file_type,
       dropboxPath: r.dropbox_path,
+      directoryPath: r.directory_path,
+      dropboxUrl: buildDropboxUrl(r.dropbox_path, r.file_name),
       wordCount: r.word_count,
       fileSizeBytes: r.file_size_bytes ? Number(r.file_size_bytes) : null,
       pageCount: r.page_count,
@@ -125,13 +142,33 @@ rlcRoutes.get('/stats', async (c) => {
   });
 });
 
-// GET /:id — full document detail (after /search and /stats)
+// GET /directories — directory tree with document counts
+rlcRoutes.get('/directories', async (c) => {
+  const rows = await db.execute(sql`
+    SELECT
+      directory_path,
+      count(*)::int AS doc_count
+    FROM rlc_documents
+    WHERE status = 'completed' AND directory_path IS NOT NULL
+    GROUP BY directory_path
+    ORDER BY directory_path
+  `);
+
+  return c.json({
+    directories: (rows as any[]).map((r) => ({
+      path: r.directory_path,
+      docCount: r.doc_count,
+    })),
+  });
+});
+
+// GET /:id — full document detail (after /search, /stats, /directories)
 rlcRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
 
   const rows = await db.execute(sql`
     SELECT
-      id, file_name, file_type, dropbox_path, word_count,
+      id, file_name, file_type, dropbox_path, directory_path, word_count,
       file_size_bytes, page_count, dropbox_modified, status,
       extracted_text, text_preview, error_message,
       created_at, updated_at
@@ -150,6 +187,8 @@ rlcRoutes.get('/:id', async (c) => {
     fileName: doc.file_name,
     fileType: doc.file_type,
     dropboxPath: doc.dropbox_path,
+    directoryPath: doc.directory_path,
+    dropboxUrl: buildDropboxUrl(doc.dropbox_path, doc.file_name),
     wordCount: doc.word_count,
     fileSizeBytes: doc.file_size_bytes ? Number(doc.file_size_bytes) : null,
     pageCount: doc.page_count,

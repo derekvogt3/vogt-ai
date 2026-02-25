@@ -57,6 +57,13 @@
       "when": 1772000000000,
       "tag": "0007_rename_documents_to_rlc",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771983268686,
+      "tag": "0008_loud_silverclaw",
+      "breakpoints": true
     }
   ]
 }

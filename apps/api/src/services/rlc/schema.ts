@@ -6,6 +6,7 @@ export const rlcDocuments = pgTable('rlc_documents', {
   fileName: text('file_name').notNull(),
   fileType: varchar('file_type', { length: 20 }).notNull(),
   fileSizeBytes: bigint('file_size_bytes', { mode: 'number' }),
+  directoryPath: text('directory_path'),
   extractedText: text('extracted_text'),
   textPreview: text('text_preview'),
   status: varchar('status', { length: 20 }).notNull().default('pending'),
